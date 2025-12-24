@@ -1,0 +1,673 @@
+html, body {
+	height: 100%;
+	margin: 0;
+	padding: 0;
+	overflow: hidden;
+	font-size: 14px;
+}
+
+body {
+	background-repeat: no-repeat;
+	background-size: cover;
+	background-position: center;
+	background-attachment: fixed;
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans',
+		'Droid Sans', 'Helvetica Neue', 'Microsoft Yahei', sans-serif;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	width: 100%;
+	min-width: 1719px;
+}
+
+.main_bg {
+	width: 100%;
+	height: 100vh;
+	margin: 0;
+	max-width: none;
+	min-height: auto;
+	display: flex;
+	clear: both;
+	position: relative;
+	transition: all 0.3s;
+	background-image: none !important;
+}
+
+.main_left {
+	float: left;
+	height: 100%;
+	width: 21%;
+	padding-top: 30px;
+	transition: width 0.3s;
+	background-color: rgba(255, 255, 255, 0.2) !important;
+	backdrop-filter: blur(8px);
+	box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+	overflow-y: auto;
+}
+
+.main_left_logo {
+	height: 200px;
+	text-align: center;
+}
+
+.main_left_menu {
+	margin-top: 50px;
+	margin-bottom: 80px;
+}
+
+.main_left_menu ul {
+	list-style-type: none;
+	margin: 0;
+	padding: 0;
+	width: 352px;
+}
+
+.main_left_menu ul li {
+	margin: 8px 0;
+}
+
+.main_left_menu ul li a {
+	font-size: 18px;
+	font-weight: 500;
+	text-align: left;
+	display: block;
+	color: rgba(255, 255, 255, 0.7);
+	text-decoration: none;
+	padding: 12px 30px;
+	border-radius: 8px;
+	transition: all 0.3s ease;
+	margin-left: -15px;
+	width: calc(100% + 30px);
+}
+
+.main_left_menu ul li a:hover {
+	background-color: rgba(255, 255, 255, 0.15);
+	color: rgba(255, 255, 255, 0.9);
+	border-radius: 0 8px 8px 0;
+	padding-left: 45px;
+}
+
+/* 选中状态 */
+.main_left_menu ul li a.active {
+	color: rgba(255, 255, 255, 0.9) !important;
+	font-weight: 600;
+}
+
+.changeImg {
+	width: 352px;
+	height: 65px;
+	line-height: 65px;
+	cursor: pointer;
+}
+
+
+.changeImg2 {
+	height: 65px;
+	line-height: 65px;
+	cursor: pointer;
+}
+
+.main_right {
+	position: relative;
+	z-index: 10;
+	display: flex;
+	flex-direction: column;
+	float: right;
+	width: 79%;
+	height: 100%;
+	overflow-y: auto;
+	flex-grow: 1;
+	transition: width 0.3s;
+	background-color: transparent !important;
+}
+
+.top_info {
+	position: sticky;
+	top: 0;
+	z-index: 100;
+	width: 100%;
+	padding: 0 20px;
+	margin-top: 0;
+	box-sizing: border-box;
+	font-size: 14px;
+	color: #ffffffb0;
+	line-height: 50px;
+	text-align: left;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;	
+	background-color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.top_info_text {
+	font-size: 15px;
+	font-weight: bold;
+}
+
+.chatmessage {
+	margin-top: 0;
+	height: calc(100vh - 50px);
+	padding-bottom: 48px;
+	overflow-y: scroll;
+	z-index: 1;
+	background-color: rgba(255, 255, 255, 0.5) !important;
+	transition: height 0.3s ease;
+}
+
+.chat-container {
+	max-width: 100%;
+	margin: 20px auto;
+	padding: 20px;
+}
+
+.message {
+	display: flex;
+	margin-bottom: 20px;
+}
+
+.receiver-message {
+	justify-content: flex-start;
+	padding-right: 30%;
+}
+
+.sender-message {
+	justify-content: flex-end;
+	padding-left: 30%;
+}
+
+.avatar {
+	width: 52px;
+	height: 52px;
+	border-radius: 50%;
+	margin-right: 25px;
+	margin-left: 15px;
+}
+
+.message-content {
+	flex: 0 1 auto;
+}
+
+.message-bubble {
+	background-color: rgba(255, 255, 255, 0.92) !important;
+	border-radius: 12px;
+	padding: 12px 16px;
+	font-size: 15px;
+	color: #333;
+	line-height: 1.6;
+	letter-spacing: 0.2px;
+	white-space: pre-wrap;
+	word-wrap: break-word;
+	box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
+	background: linear-gradient(145deg, rgba(255, 255, 255, 0.95), rgba(245, 245, 245, 0.95)) !important;
+}
+
+.sender-message.message-bubble {
+	background: linear-gradient(145deg, rgba(78, 168, 255, 0.9), rgba(0, 122, 255, 0.9)) !important;
+	color: rgba(255, 255, 255, 0.98);
+	text-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
+	border-radius: 12px;
+	padding: 12px 16px;
+}
+
+.message-time {
+	font-size: 12px;
+	color: #999;
+	margin-top: 8px;
+	text-align: left;
+}
+
+.sender-message-time {
+	font-size: 12px;
+	color: #999;
+	margin-top: 8px;
+	text-align: right;
+}
+
+.inputmessage {
+	position: fixed;
+	bottom: 10px;
+	left: 0;
+	right: 0;
+	margin: 0 auto;
+	z-index: 100;
+	width: 760px;
+	background: rgba(255, 255, 255, 0.3) !important;
+	backdrop-filter: blur(10px);
+	border: 1px solid rgba(255, 255, 255, 0.2);
+	border-radius: 70px;
+	height: 73px;
+	box-shadow: -10px 0 15px rgba(0, 0, 0, 0.1);
+}
+
+.inputmessage_voice {
+	width: 50px;
+	float: left;
+	height: 73px;
+	padding: 15px 5px 0 20px;
+}
+
+.inputmessage_input {
+	background-color: transparent !important;
+	width: 540px;
+	float: left;
+	margin-top: 15px;
+	height: 45px;
+}
+
+.inputmessage_send {
+	width: 50px;
+	float: left;
+	height: 73px;
+	padding: 15px 5px 0 15px;
+}
+
+.inputmessage_open {
+	width: 60px;
+	float: right;
+	height: 73px;
+	padding: 15px 5px 0 5px;
+}
+
+.text_in {
+	width: 540px;
+	height: 45px;
+	padding: 0 10px;
+	outline: none;
+	border: none;
+	background: transparent !important;
+	resize: none;
+	font-size: 14px;
+	color: #333;
+}
+
+.tag-container {
+	background-color: #FFFFFF;
+	display: flex;
+}
+
+.tag {
+	background: url('../images/tabline.png') right no-repeat;
+	padding: 5px 10px;
+	font-size: 14px;
+	cursor: pointer;
+	color: #617bab;
+	line-height: 30px;
+}
+
+.tag.selected {
+	background-color: #f4f7ff;
+	color: #0064fb;
+}
+
+.adopt {
+	border: none;
+	background: none;
+}
+
+.what-time {
+	vertical-align: top;
+	line-height: 25px;
+}
+
+.answer-container {
+	border: 1px solid #ccc;
+	padding: 10px;
+	margin: 10px;
+	background-color: #f9f9f9;
+}
+
+.sidebar-toggle {
+	position: fixed;
+	left: 20px;
+	bottom: 20px;
+	cursor: pointer;
+	z-index: 1000;
+	width: 40px;
+	height: 40px;
+	border-radius: 50%;
+	background-color: rgba(255, 255, 255, 0.8);
+	box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: all 0.3s ease;
+}
+
+.sidebar-toggle:hover {
+	background-color: rgba(255, 255, 255, 0.9);
+	transform: scale(1.1);
+}
+
+.sidebar-toggle img {
+	width: 30px;
+	height: 30px;
+	transition: transform 0.3s ease;
+}
+
+.main_left.collapsed {
+	width: 0;
+	overflow: hidden;
+	transition: width 0.3s;
+	background-color: transparent;
+}
+
+.main_left.collapsed + .main_right {
+	width: 100%;
+	transition: width 0.3s;
+	background-color: transparent !important;
+}
+
+.main_left.collapsed + .main_right ~ .main_bg {
+	background-image: none;
+}
+
+.collapsed-bg {
+	background-image: none !important;
+}
+
+/* 添加ASR切换按钮样式 */
+.asr-toggle {
+	position: fixed;
+	left: 20px;
+	bottom: 70px; /* 在侧边栏切换按钮上方 */
+	cursor: pointer;
+	z-index: 1000;
+	width: 40px;
+	height: 40px;
+	border-radius: 50%;
+	background-color: rgba(255, 255, 255, 0.8);
+	box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: all 0.3s ease;
+}
+
+.asr-toggle:hover {
+	background-color: rgba(255, 255, 255, 0.9);
+	transform: scale(1.1);
+}
+
+.asr-toggle img {
+	width: 20px;
+	height: 20px;
+	transition: transform 0.3s ease;
+	transform: scale(1.8); /* 放大1.2倍 */
+}
+
+/* 修改清除历史记录按钮为隐藏按钮 */
+.clear-history-toggle {
+	position: fixed;
+	left: 20px;
+	bottom: 120px; /* 在ASR切换按钮上方 */
+	cursor: pointer;
+	z-index: 1000;
+	width: 40px;
+	height: 40px;
+	border-radius: 50%;
+	background-color: rgba(255, 255, 255, 0.8);
+	box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: all 0.3s ease;
+}
+
+.clear-history-toggle:hover {
+	background-color: rgba(255, 255, 255, 0.9);
+	transform: scale(1.1);
+}
+
+.clear-history-toggle img {
+	width: 20px;
+	height: 20px;
+	transition: transform 0.3s ease;
+}
+/* 添加隐藏效果 */
+.hidden-content {
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* 更平滑的缓动曲线 */
+    height: 0;
+    overflow: hidden;
+}
+/* 添加透明背景样式 */
+.top_info.transparent-bg {
+	background-color: transparent !important;
+	backdrop-filter: none;
+	box-shadow: none;
+}
+
+/* 确保隐藏内容时顶部信息栏文字仍然可见 */
+.top_info.transparent-bg .top_info_text,
+.top_info.transparent-bg {
+	color: rgba(255, 255, 255, 0.9);
+	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+
+/* 输入框文本区域 */
+.text_in {
+	background: transparent !important;
+	color: #333; /* 深色文字保证可读性 */
+}
+
+/* 按钮图标适配 */
+.inputmessage_voice img,
+.inputmessage_send img,
+.inputmessage_open img {
+	filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1)); /* 添加阴影提升可见性 */
+}
+
+/* 发送者头像调整左边距 */
+.sender-message .avatar {
+	margin-left: 25px;  /* 保持对称间距 */
+}
+
+/* 确保设置页面的侧边栏使用相同样式 */
+.setting-page .main_left {
+	background-color: rgba(255, 255, 255, 0.2) !important;
+	backdrop-filter: blur(8px);
+	box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+}
+
+/* 设置页面功能按钮定位 */
+.setting-page .sidebar-toggle {
+	bottom: 20px;
+}
+.setting-page .asr-toggle {
+	bottom: 70px;
+}
+.setting-page .clear-history-toggle {
+	bottom: 120px;
+}
+
+/* 调整设置页面内容区域 */
+.setting-page .main_right {
+	background-color: transparent !important;
+	background-color: rgba(255, 255, 255, 0.5) !important;
+	backdrop-filter: blur(5px);
+	border-radius: 10px;
+	margin: 20px;
+	padding: 30px;
+}
+
+/* 调整定位输入框的间距 */
+.setting_name li:first-child {
+	margin-top: 0;
+}
+
+/* 调整剩余设置项的间距 */
+.setting_work li {
+	margin-top: 0;
+}
+
+.active {
+	color: rgba(255, 255, 255, 0.9) !important;
+	font-weight: 600;
+}
+
+/* 统一设置页面菜单样式 */
+.setting-page .main_left_menu {
+	margin-top: 50px;
+	margin-bottom: 80px;
+}
+
+.setting-page .main_left_menu ul {
+	list-style-type: none;
+	margin: 0;
+	padding: 0;
+	width: 352px;
+}
+
+.setting-page .main_left_menu ul li {
+	margin: 8px 0;
+}
+
+.setting-page .main_left_menu ul li a {
+	font-size: 18px;
+	font-weight: 500;
+	text-align: left;
+	display: block;
+	color: rgba(255, 255, 255, 0.7);
+	text-decoration: none;
+	padding: 12px 30px;
+	border-radius: 8px;
+	transition: all 0.3s ease;
+	margin-left: -15px;
+	width: calc(100% + 30px);
+}
+
+.setting-page .main_left_menu ul li a:hover {
+	background-color: rgba(255, 255, 255, 0.15);
+	color: rgba(255, 255, 255, 0.9);
+	border-radius: 0 8px 8px 0;
+	padding-left: 45px;
+}
+
+.setting-page .main_left_menu ul li a.active {
+	color: rgba(255, 255, 255, 0.9) !important;
+	font-weight: 600;
+}
+
+/* 新增菜单标题样式 */
+.menu-header {
+	margin-top:60px;
+	margin-bottom: -20px;
+}
+
+.menu-header img {
+	width: 60%;
+	height: auto;
+	object-fit: contain;
+	display: block;
+	margin:0 auto;
+}
+
+/* 背景切换按钮样式 */
+.bg-toggle {
+	position: fixed;
+	left: 20px;
+	bottom: 170px; /* 在其他按钮上方 */
+	cursor: pointer;
+	z-index: 1000;
+	width: 40px;
+	height: 40px;
+	border-radius: 50%;
+	background-color: rgba(255, 255, 255, 0.8);
+	box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: all 0.3s ease;
+}
+
+.bg-toggle:hover {
+	background-color: rgba(255, 255, 255, 0.9);
+	transform: scale(1.1);
+}
+
+.bg-toggle img {
+	width: 20px;
+	height: 20px;
+	transition: transform 0.3s ease;
+}
+
+/* 清除历史按钮样式 */
+.history-clear-toggle {
+	position: fixed;
+	left: 20px;
+	bottom: 220px; /* 在背景切换按钮上方 */
+	cursor: pointer;
+	z-index: 1000;
+	width: 40px;
+	height: 40px;
+	border-radius: 50%;
+	background-color: rgba(255, 255, 255, 0.8);
+	box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: all 0.3s ease;
+}
+
+.history-clear-toggle:hover {
+	background-color: rgba(255, 255, 255, 0.9);
+	transform: scale(1.1);
+}
+
+.history-clear-toggle img {
+	width: 20px;
+	height: 20px;
+	transition: transform 0.3s ease;
+}
+
+/* 设置页面功能按钮定位 */
+.setting-page .sidebar-toggle {
+	bottom: 20px;
+}
+.setting-page .asr-toggle {
+	bottom: 70px;
+}
+.setting-page .clear-history-toggle {
+	bottom: 120px;
+}
+.setting-page .bg-toggle {
+	bottom: 170px;
+}
+.setting-page .history-clear-toggle {
+	bottom: 220px;
+}
+
+/* 语音模式切换按钮样式 */
+.voice-toggle {
+	position: fixed;
+	left: 20px;
+	bottom: 270px; /* 在清除历史按钮上方 */
+	cursor: pointer;
+	z-index: 1000;
+	width: 40px;
+	height: 40px;
+	border-radius: 50%;
+	background-color: rgba(255, 255, 255, 0.8);
+	box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: all 0.3s ease;
+}
+
+.voice-toggle:hover {
+	background-color: rgba(255, 255, 255, 0.9);
+	transform: scale(1.1);
+}
+
+.voice-toggle img {
+	width: 20px;
+	height: 20px;
+	transition: transform 0.3s ease;
+}
+
+/* 更新设置页面按钮位置 */
+.setting-page .voice-toggle {
+	bottom: 270px;
+}

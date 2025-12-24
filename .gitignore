@@ -129,3 +129,4 @@ dmypy.json
 .pyre/
 samples/
 system.conf
+cache_data/*.wav

@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fay数字人</title>
+    <link rel="stylesheet" href="{{ url_for('static',filename='css/index.css') }}"/>
+    <link rel="stylesheet" href="{{ url_for('static',filename='css/setting.css') }}"/>
+    <link rel="icon" href="{{ url_for('static',filename='images/favicon.ico') }}" type="image/x-icon">
+
+    <!-- 引入样式 -->
+<link rel="stylesheet" href="{{ url_for('static',filename='css/element/index.css') }}">
+  </head>
+
+  <body>
+    <div class="main_bg" id="app">
+      <!-- 添加侧边栏切换按钮 -->
+      <div class="sidebar-toggle" @click="toggleSidebar">
+        <img v-if="isSidebarVisible" src="{{ url_for('static',filename='images/arrow-left.png') }}" alt="收起侧边栏">
+        <img v-else src="{{ url_for('static',filename='images/arrow-right.png') }}" alt="展开侧边栏">
+      </div>
+
+      <div class="clear-history-toggle" @click="toggleContentVisibility">
+        <img v-if="isContentVisible" src="{{ url_for('static',filename='images/eye-open.png') }}" alt="隐藏内容">
+        <img v-else src="{{ url_for('static',filename='images/eye-close.png') }}" alt="显示内容">
+      </div>
+
+      <div class="asr-toggle" @click="changeASRModel">
+        <img v-if="now_asr_mode === 'huyu'" src="{{ url_for('static',filename='images/huyu-icon.png') }}" alt="沪语模型">
+        <img v-else src="{{ url_for('static',filename='images/xunfei-icon.png') }}" alt="讯飞模型">
+      </div>
+
+      <div class="bg-toggle" @click="changeBackground">
+        <img src="{{ url_for('static',filename='images/bg-icon.png') }}" alt="切换背景">
+      </div>
+      
+      <div class="main_left" :class="{ 'collapsed': !isSidebarVisible }">
+        <div class="menu-header">
+          <img src="{{ url_for('static',filename='images/title.png') }}" alt="系统标题">
+        </div>
+        <div class="main_left_menu">
+          <ul>
+            <li><a href="/" :class="{ 'active': isIndexPage }" @click.prevent="switchPage('index')">消息</a></li>
+            <li><a href="/setting" :class="{ 'active': isSettingPage }" @click.prevent="switchPage('setting')">设置</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="main_right">
+        <div class="setting-header" :class="{ 'hidden-content': !isContentVisible }">
+          <h2>系统设置</h2>
+          <div class="status-indicators">
+            <span v-if="isConnected" class="status-badge connected">已连接数字人</span>
+            <span v-if="remoteAudioConnected" class="status-badge audio-connected">已连接远程音频</span>
+          </div>
+        </div>
+        
+        <div class="setting-container" :class="{ 'hidden-content': !isContentVisible }">
+          <div class="setting-card voice-settings">
+            <h3>语音设置</h3>
+            <div class="setting-row">
+              <label class="setting-label">唤醒模式</label>
+              <el-switch @change=saveConfig() v-model="wake_word_enabled" active-color="#13ce66" inactive-color="#ff4949"></el-switch>
+            </div>
+            
+            <div class="setting-row">
+              <label class="setting-label">唤醒词</label>
+              <input v-model="wake_word" placeholder="请输入内容（以,隔开）" :disabled="!configEditable" class="setting-input" />
+            </div>
+            
+            <div class="setting-row">
+              <label class="setting-label">唤醒方式</label>
+              <select class="setting-input" v-model="wake_word_type" :disabled="!configEditable">
+                <option v-for="item in wake_word_type_options" :key="item.value" :label="item.label" :value="item.value"></option>
+              </select>
+            </div>
+            
+            <div class="setting-row">
+              <label class="setting-label">声音选择</label>
+              <select v-model="attribute_voice" placeholder="请选择" class="setting-input" :disabled="!configEditable">
+                <option v-for="item in voiceList" :key="item.value" :label="item.label" :value="item.value"></option>
+              </select>
+            </div>
+            
+            <div class="setting-row">
+              <label class="setting-label">敏感度</label>
+              <el-slider style="width: 70%;" v-model="interact_perception_follow" :disabled="!configEditable"></el-slider>
+            </div>
+          </div>
+          
+          <div class="setting-card device-settings">
+            <h3>设备设置</h3>
+            <div class="setting-row">
+              <label class="setting-label">服务器扬声器</label>
+              <el-switch v-model="play_sound_enabled" active-color="#13ce66" inactive-color="#ff4949" @change=saveConfig()></el-switch>
+            </div>
+            
+            <div class="setting-row">
+              <label class="setting-label">服务器麦克风</label>
+              <el-switch v-model="source_record_enabled" active-color="#13ce66" inactive-color="#ff4949" @change=saveConfig()></el-switch>
+            </div>
+            
+            <div class="setting-row">
+              <label class="setting-label">自动播放</label>
+              <div class="auto-play-container">
+                <el-switch v-model="automatic_player_status" @change=saveConfig() active-color="#13ce66" inactive-color="#ff4949"></el-switch>
+                <input class="setting-input auto-play-input" v-model="automatic_player_url" placeholder="http://127.0.0.1:6000" :disabled="!configEditable" />
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="setting-actions" :class="{ 'hidden-content': !isContentVisible }">
+          <el-button type="primary" :disabled="!configEditable" @click=saveConfig() class="action-button save-button">保存配置</el-button>
+          
+          <el-button v-if="liveState == 1" type="danger" @click=stopLive() class="action-button">关闭（运行中）</el-button>
+          <el-button v-else-if="liveState == 2" type="info" disabled class="action-button">正在开启...</el-button>
+          <el-button v-else-if="liveState == 3" type="info" disabled class="action-button">正在关闭...</el-button>
+          <el-button v-else type="success" @click=startLive() class="action-button">开启</el-button>
+        </div>
+      </div>
+    </div>
+
+    </body>
+    <!-- import Vue before Element -->
+    <script src="{{ url_for('static',filename='js/vue.js') }}"></script>
+    <script src="{{ url_for('static',filename='js/element.js') }}"></script> <!-- 这里需要确保先引入 Element -->
+    <script src="{{ url_for('static',filename='js/setting.js') }}"></script>
+ 
+</html>
