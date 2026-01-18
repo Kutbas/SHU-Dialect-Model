@@ -44,9 +44,7 @@
         "wake_word_type": "front"
     },
     "voice_mode": {
-        "length": 0.8,
-        "sdp_ratio": 0.2,
-        "segment_size": 50,
-        "speaker_id": 1
+        "mode": null,
+        "ratio": 0.2
     }
 }

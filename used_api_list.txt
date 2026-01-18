@@ -1,0 +1,12 @@
+[GET] /
+[POST] /api/get_run_status
+[POST] /api/get-data
+[POST] /api/get-asr-mode
+[POST] /api/get-member-list
+[POST] /api/get-msg
+[POST] /api/start-live
+[POST] /api/send
+[POST] /api/submit
+[POST] /api/change-voice-mode
+[POST] /api/clear-history
+[POST] /api/change-asr-mode
