@@ -75,6 +75,19 @@ def console_listener():
         except (EOFError, KeyboardInterrupt, UnicodeDecodeError):
             # 当控制台被关闭/用户按Ctrl+C/编码出错时，都可能抛这类异常
             util.log(1, "停止console监听！")
+            
+            # 添加全局清理
+            import os
+
+            print("正在清理资源...")
+
+            # 停止所有后台服务
+            if "fay_booter" in globals() and fay_booter.is_running():
+                fay_booter.stop()
+
+            # 强制退出
+            os._exit(0)  # 立即退出，不等待其他线程
+
             break
 
         args = text.split(" ")
