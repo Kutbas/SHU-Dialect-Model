@@ -15,7 +15,6 @@ from asr import xunfei
 from asr import huyu
 from core import wsa_server
 from gui import flask_server
-from gui.window import MainWindow
 from core import content_db
 import fay_booter
 from scheduler.thread_manager import MyThread
@@ -27,11 +26,6 @@ import uvicorn
 
 # 载入配置
 config_util.load_config()
-
-# 是否为普通模式（桌面模式）
-if config_util.start_mode == "common":
-    from PyQt5 import QtGui
-    from PyQt5.QtWidgets import QApplication
 
 
 # 音频清理
@@ -138,9 +132,11 @@ def console_listener():
         else:
             util.log(1, "未知命令！使用 'help' 获取帮助.")
 
+
 def run_fastapi():
     # host="0.0.0.0" 允许局域网访问
     uvicorn.run(fast_api_server.app, host="127.0.0.1", port=5000, log_level="warning")
+
 
 if __name__ == "__main__":
     __clear_samples()
@@ -193,18 +189,9 @@ if __name__ == "__main__":
     if parsed_args.command.lower() == "start":
         MyThread(target=fay_booter.start).start()
 
-    # 普通模式下启动窗口
-    if config_util.start_mode == "common":
-        app = QApplication(sys.argv)
-        app.setWindowIcon(QtGui.QIcon("icon.png"))
-        win = MainWindow()
-        time.sleep(1)
-        win.show()
-        app.exit(app.exec_())
-    else:
-        try:
-            while True:
-                time.sleep(1)
-        except KeyboardInterrupt:
-            print("主线程检测到 KeyboardInterrupt，程序正在退出...")
-            sys.exit(0)
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("主线程检测到 KeyboardInterrupt，程序正在退出...")
+        sys.exit(0)
