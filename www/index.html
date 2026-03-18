@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI聊天助手</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/github-dark.min.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 顶部导航栏 -->
+        <header class="header">
+            <div class="header-left">
+                <div class="logo">
+                    <i class="fas fa-robot"></i>
+                    <span>AI聊天助手</span>
+                </div>
+                <button class="new-chat-btn" id="newChatBtn">
+                    <i class="fas fa-plus"></i>
+                    新建对话
+                </button>
+            </div>
+        </header>
+
+        <!-- 主内容区域 -->
+        <div class="main-content">
+            <!-- 左侧会话列表 -->
+            <aside class="sidebar">
+                <div class="session-list" id="sessionList">
+                    <!-- 会话列表将通过JavaScript动态加载 -->
+                </div>
+            </aside>
+
+            <!-- 右侧聊天区域 -->
+            <main class="chat-area">
+                <!-- 默认欢迎界面 -->
+                <div class="welcome-screen" id="welcomeScreen">
+                    <div class="welcome-content">
+                        <i class="fas fa-comments"></i>
+                        <h2>选择一个历史对话继续，或创建新的对话，开启您的AI之旅</h2>
+                        <button class="welcome-new-chat-btn" id="welcomeNewChatBtn">
+                            新建对话
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 聊天界面 -->
+                <div class="chat-interface" id="chatInterface" style="display: none;">
+                    <!-- 聊天消息区域 -->
+                    <div class="messages-container" id="messagesContainer">
+                        <!-- 消息将通过JavaScript动态加载 -->
+                    </div>
+
+                    <!-- 输入区域 -->
+                    <div class="input-area">
+                        <div class="input-container">
+                            <textarea 
+                                id="messageInput" 
+                                placeholder="请输入您的消息...(Enter发送，Shift+Enter换行)"
+                                maxlength="2000"
+                            ></textarea>
+                            <div class="input-footer">
+                                <span class="char-count" id="charCount">0/2000</span>
+                                <button class="send-btn" id="sendBtn">
+                                    <i class="fas fa-paper-plane"></i>
+                                    发送
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- 模型选择弹窗 -->
+    <div class="modal-overlay" id="modelModal" style="display: none;">
+        <div class="model-modal">
+            <div class="modal-header">
+                <h3>选择模型</h3>
+                <button class="close-btn" id="closeModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-content">
+                <div class="model-grid" id="modelGrid">
+                    <!-- 模型列表将通过JavaScript动态加载 -->
+                </div>
+                <div class="modal-actions">
+                    <button class="cancel-btn" id="cancelBtn">取消</button>
+                    <button class="confirm-btn" id="confirmBtn">确定</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 加载指示器 -->
+    <div class="loading-overlay" id="loadingOverlay" style="display: none;">
+        <div class="loading-spinner">
+            <i class="fas fa-spinner fa-spin"></i>
+            <span>处理中...</span>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
