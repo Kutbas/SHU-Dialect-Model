@@ -44,7 +44,7 @@
         "wake_word_type": "front"
     },
     "voice_mode": {
-        "mode": null,
+        "mode": 1,
         "ratio": 0.2
     }
 }
