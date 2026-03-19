@@ -27,12 +27,45 @@ from flask_httpauth import HTTPBasicAuth
 from core import qa_service
 
 __app = Flask(__name__)
+
+# ================= 探针代码开始 =================
+# 定义一个集合来存储已发现的接口，避免重复打印
+used_routes = set()
+
+
+@__app.after_request
+def monitor_requests(response):
+    # 排除静态资源（如果不关心 js/css/图片）
+    if (
+        request.path.startswith("/static")
+        or request.path.endswith(".js")
+        or request.path.endswith(".css")
+    ):
+        return response
+
+    # 记录接口
+    route_info = f"[{request.method}] {request.path}"
+
+    if route_info not in used_routes:
+        used_routes.add(route_info)
+        # 用显眼的颜色打印出来
+        print(f"\n🔥 [发现活跃接口] {route_info}  --> 响应: {response.status_code}")
+
+        # 可选：保存到文件，防止控制台刷太快看漏了
+        with open("used_api_list.txt", "a", encoding="utf-8") as f:
+            f.write(f"{route_info}\n")
+
+    return response
+
+
+# ================= 探针代码结束 =================
+
 # 禁用 Flask 默认日志
 __app.logger.disabled = True
-log = logging.getLogger('werkzeug')
+log = logging.getLogger("werkzeug")
 log.disabled = True
 # 禁用请求日志中间件
-__app.config['PROPAGATE_EXCEPTIONS'] = True
+__app.config["PROPAGATE_EXCEPTIONS"] = True
 
 auth = HTTPBasicAuth()
 CORS(__app, supports_credentials=True)
@@ -40,20 +73,23 @@ CORS(__app, supports_credentials=True)
 # 在文件顶部添加全局变量
 CURRENT_VOICE_MODE = 0
 
+
 def load_users():
     try:
-        with open('verifier.json') as f:
+        with open("verifier.json") as f:
             users = json.load(f)
         return users
     except Exception as e:
         print(f"Error loading users: {e}")
         return {}
 
+
 users = load_users()
+
 
 @auth.verify_password
 def verify_password(username, password):
-    if not users or config_util.start_mode == 'common':
+    if not users or config_util.start_mode == "common":
         return True
     if username in users and users[username] == password:
         return username
@@ -61,18 +97,19 @@ def verify_password(username, password):
 
 def __get_template():
     try:
-        return render_template('index.html')
+        return render_template("index.html")
     except Exception as e:
         return f"Error rendering template: {e}", 500
 
+
 def __get_device_list():
     try:
-        if config_util.start_mode == 'common':
+        if config_util.start_mode == "common":
             audio = pyaudio.PyAudio()
             device_list = []
             for i in range(audio.get_device_count()):
                 devInfo = audio.get_device_info_by_index(i)
-                if devInfo['hostApi'] == 0:
+                if devInfo["hostApi"] == 0:
                     device_list.append(devInfo["name"])
             return list(set(device_list))
         else:
@@ -81,15 +118,16 @@ def __get_device_list():
         print(f"Error getting device list: {e}")
         return []
 
-@__app.route('/api/submit', methods=['post'])
+
+@__app.route("/api/submit", methods=["post"])
 def api_submit():
-    data = request.values.get('data')
+    data = request.values.get("data")
     if not data:
-        return jsonify({'result': 'error', 'message': '未提供数据'})
+        return jsonify({"result": "error", "message": "未提供数据"})
     try:
         config_data = json.loads(data)
-        if 'config' not in config_data:
-            return jsonify({'result': 'error', 'message': '数据中缺少config'})
+        if "config" not in config_data:
+            return jsonify({"result": "error", "message": "数据中缺少config"})
 
         config_util.load_config()
         existing_config = config_util.config
@@ -104,28 +142,26 @@ def api_submit():
                 else:
                     existing[key] = value
 
-        merge_configs(existing_config, config_data['config'])
+        merge_configs(existing_config, config_data["config"])
 
         config_util.save_config(existing_config)
         config_util.load_config()
 
-        return jsonify({'result': 'successful'})
+        return jsonify({"result": "successful"})
     except json.JSONDecodeError:
-        return jsonify({'result': 'error', 'message': '无效的JSON数据'})
+        return jsonify({"result": "error", "message": "无效的JSON数据"})
     except Exception as e:
-        return jsonify({'result': 'error', 'message': f'保存配置时出错: {e}'}), 500
-    
+        return jsonify({"result": "error", "message": f"保存配置时出错: {e}"}), 500
 
 
-
-@__app.route('/api/get-data', methods=['post'])
+@__app.route("/api/get-data", methods=["post"])
 def api_get_data():
     # 获取配置和语音列表
     try:
         config_util.load_config()
         voice_list = tts_voice.get_voice_list()
         send_voice_list = []
-        if config_util.tts_module == 'ali':
+        if config_util.tts_module == "ali":
             voice_list = [
                 {"id": "abin", "name": "阿斌"},
                 {"id": "zhixiaobai", "name": "知小白"},
@@ -201,18 +237,21 @@ def api_get_data():
                 {"id": "jielidou", "name": "杰力豆"},
                 {"id": "laotie", "name": "老铁"},
                 {"id": "laomei", "name": "老妹"},
-                {"id": "aikan", "name": "艾侃"}
+                {"id": "aikan", "name": "艾侃"},
             ]
             send_voice_list = {"voiceList": voice_list}
             wsa_server.get_web_instance().add_cmd(send_voice_list)
-        elif config_util.tts_module == 'volcano':
+        elif config_util.tts_module == "volcano":
             voice_list = [
                 {"id": "BV001_streaming", "name": "通用女声"},
                 {"id": "BV002_streaming", "name": "通用男声"},
-                {"id": "zh_male_jingqiangkanye_moon_bigtts", "name": "京腔侃爷/Harmony"},
+                {
+                    "id": "zh_male_jingqiangkanye_moon_bigtts",
+                    "name": "京腔侃爷/Harmony",
+                },
                 {"id": "zh_female_shuangkuaisisi_moon_bigtts", "name": "爽快思思/Skye"},
                 {"id": "zh_male_wennuanahu_moon_bigtts", "name": "温暖阿虎/Alvin"},
-                {"id": "zh_female_wanwanxiaohe_moon_bigtts", "name": "湾湾小何"}
+                {"id": "zh_female_wanwanxiaohe_moon_bigtts", "name": "湾湾小何"},
             ]
             send_voice_list = {"voiceList": voice_list}
             wsa_server.get_web_instance().add_cmd(send_voice_list)
@@ -221,17 +260,20 @@ def api_get_data():
             send_voice_list = []
             for voice in voice_list:
                 voice_data = voice.value
-                send_voice_list.append({"id": voice_data['name'], "name": voice_data['name']})
+                send_voice_list.append(
+                    {"id": voice_data["name"], "name": voice_data["name"]}
+                )
             wsa_server.get_web_instance().add_cmd({"voiceList": send_voice_list})
             voice_list = send_voice_list
         wsa_server.get_web_instance().add_cmd({"deviceList": __get_device_list()})
         if fay_booter.is_running():
             wsa_server.get_web_instance().add_cmd({"liveState": 1})
-        return json.dumps({'config': config_util.config, 'voice_list': voice_list})
+        return json.dumps({"config": config_util.config, "voice_list": voice_list})
     except Exception as e:
-        return jsonify({'result': 'error', 'message': f'获取数据时出错: {e}'}), 500
+        return jsonify({"result": "error", "message": f"获取数据时出错: {e}"}), 500
 
-@__app.route('/api/start-live', methods=['post'])
+
+@__app.route("/api/start-live", methods=["post"])
 def api_start_live():
     # 启动
     try:
@@ -240,9 +282,10 @@ def api_start_live():
         wsa_server.get_web_instance().add_cmd({"liveState": 1})
         return '{"result":"successful"}'
     except Exception as e:
-        return jsonify({'result': 'error', 'message': f'启动时出错: {e}'}), 500
+        return jsonify({"result": "error", "message": f"启动时出错: {e}"}), 500
 
-@__app.route('/api/stop-live', methods=['post'])
+
+@__app.route("/api/stop-live", methods=["post"])
 def api_stop_live():
     # 停止
     try:
@@ -251,36 +294,40 @@ def api_stop_live():
         wsa_server.get_web_instance().add_cmd({"liveState": 0})
         return '{"result":"successful"}'
     except Exception as e:
-        return jsonify({'result': 'error', 'message': f'停止时出错: {e}'}), 500
+        return jsonify({"result": "error", "message": f"停止时出错: {e}"}), 500
 
-@__app.route('/api/send', methods=['post'])
+
+@__app.route("/api/send", methods=["post"])
 def api_send():
     # 接收前端发送的消息
-    data = request.values.get('data')
+    data = request.values.get("data")
     if not data:
-        return jsonify({'result': 'error', 'message': '未提供数据'})
+        return jsonify({"result": "error", "message": "未提供数据"})
     try:
         info = json.loads(data)
-        username = info.get('username')
-        msg = info.get('msg')
+        username = info.get("username")
+        msg = info.get("msg")
         if not username or not msg:
-            return jsonify({'result': 'error', 'message': '用户名和消息内容不能为空'})
-        interact = Interact("text", 1, {'user': username, 'msg': msg})
-        util.printInfo(1, username, '[文字发送按钮]{}'.format(interact.data["msg"]), time.time())
+            return jsonify({"result": "error", "message": "用户名和消息内容不能为空"})
+        interact = Interact("text", 1, {"user": username, "msg": msg})
+        util.printInfo(
+            1, username, "[文字发送按钮]{}".format(interact.data["msg"]), time.time()
+        )
         # -----------
         fay_booter.feiFei.on_interact(interact)
         # -----------
         return '{"result":"successful"}'
     except json.JSONDecodeError:
-        return jsonify({'result': 'error', 'message': '无效的JSON数据'})
+        return jsonify({"result": "error", "message": "无效的JSON数据"})
     except Exception as e:
-        return jsonify({'result': 'error', 'message': f'发送消息时出错: {e}'}), 500
+        return jsonify({"result": "error", "message": f"发送消息时出错: {e}"}), 500
+
 
 # 获取指定用户的消息记录
-@__app.route('/api/get-msg', methods=['post'])
+@__app.route("/api/get-msg", methods=["post"])
 def api_get_Msg():
     try:
-        data = request.form.get('data')
+        data = request.form.get("data")
         if data is None:
             data = request.get_json()
         else:
@@ -288,106 +335,130 @@ def api_get_Msg():
         uid = member_db.new_instance().find_user(data["username"])
         contentdb = content_db.new_instance()
         if uid == 0:
-            return json.dumps({'list': []})
+            return json.dumps({"list": []})
         else:
-            list = contentdb.get_list('all', 'desc', 1000, uid)
+            list = contentdb.get_list("all", "desc", 1000, uid)
         relist = []
         i = len(list) - 1
         while i >= 0:
-            timezone = pytz.timezone('Asia/Shanghai')
-            timetext = datetime.datetime.fromtimestamp(list[i][3], timezone).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-            relist.append(dict(type=list[i][0], way=list[i][1], content=list[i][2], createtime=list[i][3], timetext=timetext, username=list[i][5], id=list[i][6], is_adopted=list[i][7]))
+            timezone = pytz.timezone("Asia/Shanghai")
+            timetext = datetime.datetime.fromtimestamp(list[i][3], timezone).strftime(
+                "%Y-%m-%d %H:%M:%S.%f"
+            )[:-3]
+            relist.append(
+                dict(
+                    type=list[i][0],
+                    way=list[i][1],
+                    content=list[i][2],
+                    createtime=list[i][3],
+                    timetext=timetext,
+                    username=list[i][5],
+                    id=list[i][6],
+                    is_adopted=list[i][7],
+                )
+            )
             i -= 1
         if fay_booter.is_running():
             wsa_server.get_web_instance().add_cmd({"liveState": 1})
-        return json.dumps({'list': relist})
+        return json.dumps({"list": relist})
     except json.JSONDecodeError:
-        return jsonify({'list': [], 'message': '无效的JSON数据'})
+        return jsonify({"list": [], "message": "无效的JSON数据"})
     except Exception as e:
-        return jsonify({'list': [], 'message': f'获取消息时出错: {e}'}), 500
+        return jsonify({"list": [], "message": f"获取消息时出错: {e}"}), 500
 
-@__app.route('/v1/chat/completions', methods=['post'])
-@__app.route('/api/send/v1/chat/completions', methods=['post'])
+
+@__app.route("/v1/chat/completions", methods=["post"])
+@__app.route("/api/send/v1/chat/completions", methods=["post"])
 def api_send_v1_chat_completions():
     # 处理聊天完成请求
     data = request.get_json()
     if not data:
-        return jsonify({'error': '未提供数据'})
+        return jsonify({"error": "未提供数据"})
     try:
         last_content = ""
-        if 'messages' in data and data['messages']:
-            last_message = data['messages'][-1]
-            username = last_message.get('role', 'User')
-            if username == 'user':
-                username = 'User'
-            last_content = last_message.get('content', 'No content provided')
+        if "messages" in data and data["messages"]:
+            last_message = data["messages"][-1]
+            username = last_message.get("role", "User")
+            if username == "user":
+                username = "User"
+            last_content = last_message.get("content", "No content provided")
         else:
-            last_content = 'No messages found'
-            username = 'User'
+            last_content = "No messages found"
+            username = "User"
 
-        model = data.get('model', 'fay')
-        observation = data.get('observation', '')
-        interact = Interact("text", 1, {'user': username, 'msg': last_content, 'observation': str(observation)})
-        util.printInfo(1, username, '[文字沟通接口]{}'.format(interact.data["msg"]), time.time())
+        model = data.get("model", "fay")
+        observation = data.get("observation", "")
+        interact = Interact(
+            "text",
+            1,
+            {"user": username, "msg": last_content, "observation": str(observation)},
+        )
+        util.printInfo(
+            1, username, "[文字沟通接口]{}".format(interact.data["msg"]), time.time()
+        )
         text = fay_booter.feiFei.on_interact(interact)
 
-        if model == 'fay-streaming':
+        if model == "fay-streaming":
             return stream_response(text)
         else:
             return non_streaming_response(last_content, text)
     except Exception as e:
-        return jsonify({'error': f'处理请求时出错: {e}'}), 500
+        return jsonify({"error": f"处理请求时出错: {e}"}), 500
 
-@__app.route('/api/get-member-list', methods=['post'])
+
+@__app.route("/api/get-member-list", methods=["post"])
 def api_get_Member_list():
     # 获取成员列表
     try:
         memberdb = member_db.new_instance()
         list = memberdb.get_all_users()
-        return json.dumps({'list': list})
+        return json.dumps({"list": list})
     except Exception as e:
-        return jsonify({'list': [], 'message': f'获取成员列表时出错: {e}'}), 500
+        return jsonify({"list": [], "message": f"获取成员列表时出错: {e}"}), 500
 
-@__app.route('/api/get_run_status', methods=['post'])
+
+@__app.route("/api/get_run_status", methods=["post"])
 def api_get_run_status():
     # 获取运行状态
     try:
         status = fay_booter.is_running()
-        return json.dumps({'status': status})
+        return json.dumps({"status": status})
     except Exception as e:
-        return jsonify({'status': False, 'message': f'获取运行状态时出错: {e}'}), 500
+        return jsonify({"status": False, "message": f"获取运行状态时出错: {e}"}), 500
 
-@__app.route('/api/adopt_msg', methods=['POST'])
+
+@__app.route("/api/adopt_msg", methods=["POST"])
 def adopt_msg():
     # 采纳消息
     data = request.get_json()
     if not data:
-        return jsonify({'status':'error', 'msg': '未提供数据'})
+        return jsonify({"status": "error", "msg": "未提供数据"})
 
-    id = data.get('id')
+    id = data.get("id")
 
     if not id:
-        return jsonify({'status':'error', 'msg': 'id不能为空'})
+        return jsonify({"status": "error", "msg": "id不能为空"})
 
-    if  config_util.config["interact"]["QnA"] == "":
-        return jsonify({'status':'error', 'msg': '请先设置Q&A文件'})
+    if config_util.config["interact"]["QnA"] == "":
+        return jsonify({"status": "error", "msg": "请先设置Q&A文件"})
 
     try:
         info = content_db.new_instance().get_content_by_id(id)
-        content = info[3] if info else ''
+        content = info[3] if info else ""
         if info is not None:
             previous_info = content_db.new_instance().get_previous_user_message(id)
-            previous_content = previous_info[3] if previous_info else ''
+            previous_content = previous_info[3] if previous_info else ""
             result = content_db.new_instance().adopted_message(id)
             if result:
                 qa_service.QAService().record_qapair(previous_content, content)
-                return jsonify({'status': 'success', 'msg': '采纳成功'})
+                return jsonify({"status": "success", "msg": "采纳成功"})
             else:
-                return jsonify({'status':'error', 'msg': '采纳失败'}), 500
+                return jsonify({"status": "error", "msg": "采纳失败"}), 500
         else:
-            return jsonify({'status':'error', 'msg': '消息未找到'}), 404
+            return jsonify({"status": "error", "msg": "消息未找到"}), 404
     except Exception as e:
-        return jsonify({'status':'error', 'msg': f'采纳消息时出错: {e}'}), 500
+        return jsonify({"status": "error", "msg": f"采纳消息时出错: {e}"}), 500
+
 
 def stream_response(text):
     # 处理流式响应
@@ -399,54 +470,50 @@ def stream_response(text):
                 "created": int(time.time()),
                 "model": "fay-streaming",
                 "choices": [
-                    {
-                        "delta": {
-                            "content": chunk
-                        },
-                        "index": 0,
-                        "finish_reason": None
-                    }
-                ]
+                    {"delta": {"content": chunk}, "index": 0, "finish_reason": None}
+                ],
             }
             yield f"data: {json.dumps(message)}\n\n"
             time.sleep(0.1)
-        yield 'data: [DONE]\n\n'
-    
-    return Response(generate(), mimetype='text/event-stream')
+        yield "data: [DONE]\n\n"
+
+    return Response(generate(), mimetype="text/event-stream")
+
 
 def non_streaming_response(last_content, text):
     # 处理非流式响应
-    return jsonify({
-        "id": "chatcmpl-8jqorq6Fw1Vi5XoH7pddGGpQeuPe0",
-        "object": "chat.completion",
-        "created": int(time.time()),
-        "model": "fay",
-        "choices": [
-            {
-                "index": 0,
-                "message": {
-                    "role": "assistant",
-                    "content": text
-                },
-                "logprobs": "",
-                "finish_reason": "stop"
-            }
-        ],
-        "usage": {
-            "prompt_tokens": len(last_content),
-            "completion_tokens": len(text),
-            "total_tokens": len(last_content) + len(text)
-        },
-        "system_fingerprint": "fp_04de91a479"
-    })
+    return jsonify(
+        {
+            "id": "chatcmpl-8jqorq6Fw1Vi5XoH7pddGGpQeuPe0",
+            "object": "chat.completion",
+            "created": int(time.time()),
+            "model": "fay",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": text},
+                    "logprobs": "",
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {
+                "prompt_tokens": len(last_content),
+                "completion_tokens": len(text),
+                "total_tokens": len(last_content) + len(text),
+            },
+            "system_fingerprint": "fp_04de91a479",
+        }
+    )
+
 
 def text_chunks(text, chunk_size=20):
-    pattern = r'([^.!?;:，。！？]+[.!?;:，。！？]?)'
+    pattern = r"([^.!?;:，。！？]+[.!?;:，。！？]?)"
     chunks = re.findall(pattern, text)
     for chunk in chunks:
         yield chunk
 
-@__app.route('/', methods=['get'])
+
+@__app.route("/", methods=["get"])
 @auth.login_required
 def home_get():
     try:
@@ -454,7 +521,8 @@ def home_get():
     except Exception as e:
         return f"Error loading home page: {e}", 500
 
-@__app.route('/', methods=['post'])
+
+@__app.route("/", methods=["post"])
 @auth.login_required
 def home_post():
     try:
@@ -462,108 +530,136 @@ def home_post():
     except Exception as e:
         return f"Error processing request: {e}", 500
 
-@__app.route('/setting', methods=['get'])
+
+@__app.route("/setting", methods=["get"])
 def setting():
     try:
-        return render_template('setting.html')
+        return render_template("setting.html")
     except Exception as e:
         return f"Error loading settings page: {e}", 500
 
+
 # 输出的音频http
-@__app.route('/audio/<filename>')
+@__app.route("/audio/<filename>")
 def serve_audio(filename):
     audio_file = os.path.join(os.getcwd(), "samples", filename)
     if os.path.exists(audio_file):
         return send_file(audio_file)
     else:
-        return jsonify({'error': '文件未找到'}), 404
+        return jsonify({"error": "文件未找到"}), 404
+
 
 # 输出的表情gif
-@__app.route('/robot/<filename>')
+@__app.route("/robot/<filename>")
 def serve_gif(filename):
     gif_file = os.path.join(os.getcwd(), "gui", "robot", filename)
     if os.path.exists(gif_file):
         return send_file(gif_file)
     else:
-        return jsonify({'error': '文件未找到'}), 404
+        return jsonify({"error": "文件未找到"}), 404
 
-#打招呼
-@__app.route('/to_greet', methods=['POST'])
+
+# 打招呼
+@__app.route("/to_greet", methods=["POST"])
 def to_greet():
     data = request.get_json()
-    username = data.get('username', 'User')
-    observation = data.get('observation', '')
-    interact = Interact("hello", 1, {'user': username, 'msg': '按观测要求打个招呼', 'observation': str(observation)})
+    username = data.get("username", "User")
+    observation = data.get("observation", "")
+    interact = Interact(
+        "hello",
+        1,
+        {
+            "user": username,
+            "msg": "按观测要求打个招呼",
+            "observation": str(observation),
+        },
+    )
     text = fay_booter.feiFei.on_interact(interact)
-    return jsonify({'status': 'success', 'data': text, 'msg': '已进行打招呼'}), 200 
+    return jsonify({"status": "success", "data": text, "msg": "已进行打招呼"}), 200
 
-#唤醒:在普通唤醒模式，进行大屏交互才有意义
-@__app.route('/to_wake', methods=['POST'])
+
+# 唤醒:在普通唤醒模式，进行大屏交互才有意义
+@__app.route("/to_wake", methods=["POST"])
 def to_wake():
     data = request.get_json()
-    username = data.get('username', 'User')
-    observation = data.get('observation', '')
+    username = data.get("username", "User")
+    observation = data.get("observation", "")
     fay_booter.recorderListener.wakeup_matched = True
-    return jsonify({'status': 'success', 'msg': '已唤醒'}), 200 
+    return jsonify({"status": "success", "msg": "已唤醒"}), 200
 
-#打断
-@__app.route('/to_stop_talking', methods=['POST'])
+
+# 打断
+@__app.route("/to_stop_talking", methods=["POST"])
 def to_stop_talking():
     try:
         data = request.get_json()
-        username = data.get('username', 'User')
-        message = data.get('text', '你好，请说？')
-        observation = data.get('observation', '')
-        interact = Interact("stop_talking", 2, {'user': username, 'text': message, 'observation': str(observation)})
+        username = data.get("username", "User")
+        message = data.get("text", "你好，请说？")
+        observation = data.get("observation", "")
+        interact = Interact(
+            "stop_talking",
+            2,
+            {"user": username, "text": message, "observation": str(observation)},
+        )
         result = fay_booter.feiFei.on_interact(interact)
-        return jsonify({
-            'status': 'success',
-            'data': str(result) if result is not None else '',
-            'msg': '已停止说话'
-        }), 200
+        return (
+            jsonify(
+                {
+                    "status": "success",
+                    "data": str(result) if result is not None else "",
+                    "msg": "已停止说话",
+                }
+            ),
+            200,
+        )
     except Exception as e:
-        return jsonify({
-            'status': 'error',
-            'msg': str(e)
-        }), 500
+        return jsonify({"status": "error", "msg": str(e)}), 500
 
 
-#消息透传接口
-@__app.route('/transparent_pass', methods=['post'])
+# 消息透传接口
+@__app.route("/transparent_pass", methods=["post"])
 def transparent_pass():
     try:
-        data = request.form.get('data')
+        data = request.form.get("data")
         if data is None:
             data = request.get_json()
         else:
             data = json.loads(data)
-        user = data.get('user', 'User')
-        response_text = data.get('text', '')
-        audio_url = data.get('audio', '')
-        interact = Interact('transparent_pass', 2, {'user': user, 'text': response_text, 'audio': audio_url})
-        util.printInfo(1, user, '透传播放：{}，{}'.format(response_text, audio_url), time.time())
+        user = data.get("user", "User")
+        response_text = data.get("text", "")
+        audio_url = data.get("audio", "")
+        interact = Interact(
+            "transparent_pass",
+            2,
+            {"user": user, "text": response_text, "audio": audio_url},
+        )
+        util.printInfo(
+            1, user, "透传播放：{}，{}".format(response_text, audio_url), time.time()
+        )
         success = fay_booter.feiFei.on_interact(interact)
-        if (success == 'success'):
-            return jsonify({'code': 200, 'message' : '成功'})
-        return jsonify({'code': 500, 'message' : '未错原因出错'})
+        if success == "success":
+            return jsonify({"code": 200, "message": "成功"})
+        return jsonify({"code": 500, "message": "未错原因出错"})
     except Exception as e:
-        return jsonify({'code': 500, 'message': f'出错: {e}'}), 500
+        return jsonify({"code": 500, "message": f"出错: {e}"}), 500
 
-@__app.route('/api/get-asr-mode', methods=['POST'])
+
+@__app.route("/api/get-asr-mode", methods=["POST"])
 def get_asr_mode():
     try:
         now_asr_mode = config_util.ASR_mode
-        return jsonify({'asr_mode': now_asr_mode})
+        return jsonify({"asr_mode": now_asr_mode})
     except Exception as e:
-        return jsonify({'result': 'error', 'message': f'获取ASR模型时出错: {e}'}), 500
+        return jsonify({"result": "error", "message": f"获取ASR模型时出错: {e}"}), 500
 
-@__app.route('/api/change-asr-mode', methods=['POST'])
+
+@__app.route("/api/change-asr-mode", methods=["POST"])
 def change_asr_model():
     try:
         data = request.get_json()
-        new_asr_model = data.get('asrModel')
-        if new_asr_model not in ['huyu', 'xunfei']:
-            return jsonify({'result': 'error', 'message': '无效的ASR模型'})
+        new_asr_model = data.get("asrModel")
+        if new_asr_model not in ["huyu", "xunfei"]:
+            return jsonify({"result": "error", "message": "无效的ASR模型"})
 
         # # 更新配置文件
         # config_util.load_config()
@@ -579,52 +675,55 @@ def change_asr_model():
             fay_booter.recorderListener.reload_asr_client()
             print(f"ASR模式已动态切换为{new_asr_model}")
 
-        return jsonify({'result': 'successful'})
+        return jsonify({"result": "successful"})
     except Exception as e:
-        return jsonify({'result': 'error', 'message': f'切换ASR模型时出错: {e}'}), 500
+        return jsonify({"result": "error", "message": f"切换ASR模型时出错: {e}"}), 500
 
-@__app.route('/api/clear-history', methods=['POST'])
+
+@__app.route("/api/clear-history", methods=["POST"])
 def clear_history():
     try:
         data = request.get_json()
-        username = data.get('username')
-        
+        username = data.get("username")
+
         if not username:
-            return jsonify({'result': 'error', 'message': '用户名不能为空'})
-        
+            return jsonify({"result": "error", "message": "用户名不能为空"})
+
         # 获取用户ID
         uid = member_db.new_instance().find_user(username)
         if uid == 0:
-            return jsonify({'result': 'error', 'message': '用户不存在'})
-        
+            return jsonify({"result": "error", "message": "用户不存在"})
+
         # 清除该用户的所有消息记录
         contentdb = content_db.new_instance()
         result = contentdb.clear_user_messages(uid)
-        
-        if result:
-            return jsonify({'result': 'successful'})
-        else:
-            return jsonify({'result': 'error', 'message': '清除历史记录失败'})
-    except Exception as e:
-        return jsonify({'result': 'error', 'message': f'清除历史记录时出错: {e}'}), 500
 
-@__app.route('/api/change-voice-mode', methods=['POST'])
+        if result:
+            return jsonify({"result": "successful"})
+        else:
+            return jsonify({"result": "error", "message": "清除历史记录失败"})
+    except Exception as e:
+        return jsonify({"result": "error", "message": f"清除历史记录时出错: {e}"}), 500
+
+
+@__app.route("/api/change-voice-mode", methods=["POST"])
 def change_voice_mode():
     try:
         data = request.get_json()
-        voice_mode = data.get('voiceMode')
-        
+        voice_mode = data.get("voiceMode")
+
         if voice_mode not in [0, 1, 2]:
-            return jsonify({'result': 'error', 'message': '无效的语音模式'})
-        
+            return jsonify({"result": "error", "message": "无效的语音模式"})
+
         # 使用全局变量存储当前的语音模式
         global CURRENT_VOICE_MODE
         CURRENT_VOICE_MODE = voice_mode
-        
+
         # 修改 vits 模块中的静态变量
         from tts import vits
+
         vits.GLOBAL_SPEAKER_ID = voice_mode
-        
+
         # 根据不同模式设置不同的参数
         if voice_mode == 2:  # 朗诵模式
             vits.GLOBAL_SDP_RATIO = 1.2
@@ -634,74 +733,73 @@ def change_voice_mode():
             vits.GLOBAL_SDP_RATIO = 0.2
             vits.GLOBAL_LENGTH = 0.8
             vits.GLOBAL_SEGMENT_SIZE = 50
-        
+
         # 记录到配置文件中以便持久化
         config_util.load_config()
-        if 'voice_mode' not in config_util.config:
-            config_util.config['voice_mode'] = {}
-        config_util.config['voice_mode']['speaker_id'] = voice_mode
-        config_util.config['voice_mode']['sdp_ratio'] = vits.GLOBAL_SDP_RATIO
-        config_util.config['voice_mode']['length'] = vits.GLOBAL_LENGTH
-        config_util.config['voice_mode']['segment_size'] = vits.GLOBAL_SEGMENT_SIZE
+        if "voice_mode" not in config_util.config:
+            config_util.config["voice_mode"] = {}
+        config_util.config["voice_mode"]["speaker_id"] = voice_mode
+        config_util.config["voice_mode"]["sdp_ratio"] = vits.GLOBAL_SDP_RATIO
+        config_util.config["voice_mode"]["length"] = vits.GLOBAL_LENGTH
+        config_util.config["voice_mode"]["segment_size"] = vits.GLOBAL_SEGMENT_SIZE
         config_util.save_config(config_util.config)
-        
-        return jsonify({'result': 'successful'})
+
+        return jsonify({"result": "successful"})
     except Exception as e:
-        return jsonify({'result': 'error', 'message': f'切换语音模式时出错: {e}'}), 500
+        return jsonify({"result": "error", "message": f"切换语音模式时出错: {e}"}), 500
+
 
 def run():
     class NullLogHandler:
         def write(self, *args, **kwargs):
             pass
-    server = pywsgi.WSGIServer(
-        ('0.0.0.0', 5000), 
-        __app,
-        log=NullLogHandler()  
-    )
+
+    server = pywsgi.WSGIServer(("0.0.0.0", 5000), __app, log=NullLogHandler())
     server.serve_forever()
+
 
 def start():
     # 加载保存的语音模式
     global CURRENT_VOICE_MODE
     config_util.load_config()
-    
+
     # 导入 vits 模块
     from tts import vits
-    
-    if 'voice_mode' in config_util.config:
+
+    if "voice_mode" in config_util.config:
         # 加载 speaker_id
-        if 'speaker_id' in config_util.config['voice_mode']:
-            CURRENT_VOICE_MODE = config_util.config['voice_mode']['speaker_id']
+        if "speaker_id" in config_util.config["voice_mode"]:
+            CURRENT_VOICE_MODE = config_util.config["voice_mode"]["speaker_id"]
             vits.GLOBAL_SPEAKER_ID = CURRENT_VOICE_MODE
-        
+
         # 加载 sdp_ratio
-        if 'sdp_ratio' in config_util.config['voice_mode']:
-            vits.GLOBAL_SDP_RATIO = config_util.config['voice_mode']['sdp_ratio']
+        if "sdp_ratio" in config_util.config["voice_mode"]:
+            vits.GLOBAL_SDP_RATIO = config_util.config["voice_mode"]["sdp_ratio"]
         else:
             # 根据当前模式设置默认值
             if CURRENT_VOICE_MODE == 2:
                 vits.GLOBAL_SDP_RATIO = 1.2
             else:
                 vits.GLOBAL_SDP_RATIO = 0.2
-        
+
         # 加载 length
-        if 'length' in config_util.config['voice_mode']:
-            vits.GLOBAL_LENGTH = config_util.config['voice_mode']['length']
+        if "length" in config_util.config["voice_mode"]:
+            vits.GLOBAL_LENGTH = config_util.config["voice_mode"]["length"]
         else:
             # 根据当前模式设置默认值
             if CURRENT_VOICE_MODE == 2:
                 vits.GLOBAL_LENGTH = 1.15
             else:
                 vits.GLOBAL_LENGTH = 0.8
-        
+
         # 加载 segment_size
-        if 'segment_size' in config_util.config['voice_mode']:
-            vits.GLOBAL_SEGMENT_SIZE = config_util.config['voice_mode']['segment_size']
+        if "segment_size" in config_util.config["voice_mode"]:
+            vits.GLOBAL_SEGMENT_SIZE = config_util.config["voice_mode"]["segment_size"]
         else:
             # 根据当前模式设置默认值
             if CURRENT_VOICE_MODE == 2:
                 vits.GLOBAL_SEGMENT_SIZE = 11
             else:
                 vits.GLOBAL_SEGMENT_SIZE = 50
-    
+
     MyThread(target=run).start()

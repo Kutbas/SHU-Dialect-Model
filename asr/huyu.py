@@ -9,7 +9,7 @@ from scheduler.thread_manager import MyThread
 API_URL = "http://202.120.117.242:5000/api/asr"
 API_KEY = "test_key"
 
-def recognize_audio_file(audio_file_path, model_id="test4", dialect="auto", use_kaldi="true"):
+def recognize_audio_file(audio_file_path, model_id="test11", dialect="auto", use_kaldi="true"):
     if not os.path.exists(audio_file_path):
         raise FileNotFoundError("音频文件不存在: " + audio_file_path)
 

@@ -4,7 +4,8 @@ import websockets
 import asyncio
 import json
 from abc import abstractmethod
-from websockets.legacy.server import Serve
+from websockets.legacy.server import Serve, serve
+
 
 from utils import util
 from scheduler.thread_manager import MyThread
@@ -184,7 +185,7 @@ class MyServer:
         if self.__server:
             util.log(1, 'server already exist')
             return
-        self.__server = websockets.serve(self.__handler, self.__host, self.__port)
+        self.__server = serve(self.__handler, self.__host, self.__port)
         asyncio.get_event_loop().run_until_complete(self.__server)
         asyncio.get_event_loop().run_forever()
 

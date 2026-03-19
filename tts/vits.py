@@ -5,17 +5,36 @@ import os
 from pydub import AudioSegment
 from utils import util, config_util
 from utils import config_util as cfg
+import shutil
+from gradio_client import Client
 
 # 添加全局变量
 GLOBAL_SPEAKER_ID = 0  # 默认为女声
 GLOBAL_SDP_RATIO = 0.2
-GLOBAL_LENGTH = 1.0 # length>1会慢，<1会快
-GLOBAL_SEGMENT_SIZE= 50
+GLOBAL_LENGTH = 1.0  # length>1会慢，<1会快
+GLOBAL_SEGMENT_SIZE = 50
+
+# 全局复用 Client，避免每次调用都重新建立连接
+# 请将 URL 替换为你实际的新 FastAPI/Gradio 地址
+GRADIO_URL = "http://202.120.117.242:23456/"
+BASE_URL = "http://202.120.117.242:23456"
+# Gradio 的标准预测接口通常是 /run/predict 或 /api/predict
+# 如果 /run/predict 报错 404，请尝试改为 /api/predict
+PREDICT_API = f"{BASE_URL}/run/predict"
+
+try:
+    util.log(1, f"正在连接语音服务 {GRADIO_URL} ...")
+    tts_client = Client(GRADIO_URL)
+    util.log(1, "连接语音服务成功")
+except Exception as e:
+    print(f"警告: 连接语音服务失败: {e}")
+    tts_client = None
+
+
 class Speech:
     def __init__(self):
         self.__history_data = []
         # 使用全局变量而不是实例变量
-        
 
     def connect(self):
         # 如果需要鉴权/初始化，这里写逻辑；否则保留空方法
@@ -33,80 +52,123 @@ class Speech:
 
     def to_sample(self, text, style):
         """
-        仿照 ali_tss.py:
-         1. 查历史缓存
-         2. 组织 URL + 参数
-         3. 发起请求获取音频
-         4. 如有必要，用pydub转换成16k WAV
-         5. 保存文件 & 记录缓存
+        使用 requests 直接调用 Gradio 接口 (fn_index=7)
+        完全避开 gradio_client 和 WebSocket 问题
         """
         try:
-            # -------------------------------
-            # 1. 查历史缓存
+            # 1. 查历史缓存 (保持原有逻辑)
             # voice_name = config_util.config["attribute"]["voice"]
             # history = self.__get_history(voice_name, style, text)
             # if history is not None:
             #     return history
 
             # -------------------------------
-            # 2. 组织 API 调用
-            # 你的服务 API: http://202.120.117.242:23456/voice/bert-vits2?id=0&length=0.8&sdp_ratio=0.2&text=你好
-            # "http://10.10.36.121:23456/"
-            base_url = "http://202.120.117.242:23456/"
-            # 使用全局变量而不是实例变量
+            # 2. 准备参数
+            # 引用全局变量
             global GLOBAL_SPEAKER_ID, GLOBAL_SDP_RATIO, GLOBAL_LENGTH
-            speaker_id = GLOBAL_SPEAKER_ID
-            sdp_ratio = GLOBAL_SDP_RATIO
-            length = GLOBAL_LENGTH
-            segement_size=GLOBAL_SEGMENT_SIZE
 
-            # 也可以把 noise/noisew/lang 等参数加进来
-            # 比如:
-            # &lang=auto&noise=0.33&noisew=0.4&emotion=0&style_text=Happy&style_weight=0.7
-            # 这里演示把 length 带上：
-            url = (f"{base_url}/voice/bert-vits2"
-                   f"?id={speaker_id}"
-                   f"&sdp_ratio={sdp_ratio}"
-                   f"&format=wav"
-                   f"&segment_size={segement_size}"
-                   f"&text={text}"
-                   f"&length={length}")
+            # 参数清洗与映射
+            input_text = text
+            model_name = "mix_G_71000.pth"  # 必填：需与网页下拉框一致，若只有一个模型通常填 "Default"
+            speaker_name = "jjp"  # 必填：转为字符串，如 "0"
+            language = "ZH"
+            sdp_ratio = float(GLOBAL_SDP_RATIO)
+            noise = 0.6
+            noisew = 0.8
+            speed = float(GLOBAL_LENGTH)
+            auto_split = True
+            emotion = style if style else "Neutral"  # 必填：情感
 
-            # 发请求
-            response = requests.get(url, stream=True)
+            util.log(
+                0, f"正在请求: {input_text} | 角色: {speaker_name} | 情感: {emotion}"
+            )
+
+            # -------------------------------
+            # 3. 构造 Payload (对应 fn_index=7 的参数顺序)
+            # 根据 view_api 输出：
+            # [文本, 模型, 说话人, 语言, sdp, noise, noisew, 语速, 切分, 情感]
+            payload = {
+                "fn_index": 7,  # ★ 核心：指定调用第7号接口
+                "data": [
+                    input_text,  # 0. 输入文本
+                    model_name,  # 1. 选择模型
+                    speaker_name,  # 2. 选择说话人
+                    language,  # 3. 语言
+                    sdp_ratio,  # 4. sdp
+                    noise,  # 5. noise
+                    noisew,  # 6. noisew
+                    speed,  # 7. 语速
+                    auto_split,  # 8. 自动切分
+                    emotion,  # 9. 情感
+                ],
+            }
+
+            # -------------------------------
+            # 4. 发送 POST 请求
+            # 设置超时时间，避免卡死
+            response = requests.post(PREDICT_API, json=payload, timeout=60)
+
             if response.status_code != 200:
-                util.log(1, "[x] 语音转换失败！")
-                util.log(1, "[x] 原因: " + response.text)
+                util.log(1, f"[x] 接口调用失败: {response.status_code}")
+                util.log(1, f"[x] 返回内容: {response.text}")
                 return None
 
             # -------------------------------
-            # 3. 先把接口返回内容存成一个临时文件
-            #    VITS 通常返回 22050Hz / 24000Hz 的 wav
-            temp_file = f'./samples/tmp-{int(time.time()*1000)}.wav'
-            with open(temp_file, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=4096):
-                    if chunk:
-                        f.write(chunk)
+            # 5. 解析返回结果
+            # 成功响应通常是: {"data": [{"name": "/tmp/...", ...}, "Success"], ...}
+            resp_json = response.json()
+
+            if "data" not in resp_json:
+                util.log(1, "[x] 返回数据格式异常")
+                return None
+
+            audio_data = resp_json["data"][0]  # 第一个返回值是音频信息
+
+            # 获取文件名
+            # 有时候返回是字符串路径，有时候是字典对象
+            server_file_path = None
+            if isinstance(audio_data, dict) and "name" in audio_data:
+                server_file_path = audio_data["name"]
+            elif isinstance(audio_data, str):
+                server_file_path = audio_data
+
+            if not server_file_path:
+                util.log(1, f"[x] 未找到音频文件路径: {audio_data}")
+                return None
 
             # -------------------------------
-            # 4. 若数字人前端只认 16k WAV，可用 pydub 转换
-            file_url = f'./samples/sample-{int(time.time() * 1000)}.wav'
-            sound = AudioSegment.from_wav(temp_file)
+            # 6. 下载音频文件
+            # Gradio 的文件下载地址通常是 /file=<path>
+            download_url = f"{BASE_URL}/file={server_file_path}"
 
-            # 强制转为 16k / 16bit / 单声道
+            # 本地临时保存
+            temp_file = f"./samples/tmp-{int(time.time()*1000)}.wav"
+
+            # 下载流
+            with requests.get(download_url, stream=True) as r:
+                if r.status_code == 200:
+                    with open(temp_file, "wb") as f:
+                        for chunk in r.iter_content(chunk_size=8192):
+                            f.write(chunk)
+                else:
+                    util.log(1, f"[x] 音频下载失败: {r.status_code}")
+                    return None
+
+            # -------------------------------
+            # 7. 格式转换 (转为 16k)
+            final_file_url = f"./samples/sample-{int(time.time() * 1000)}.wav"
+
+            sound = AudioSegment.from_wav(temp_file)  # Gradio 通常返回 wav
             sound_16k = sound.set_frame_rate(16000).set_channels(1).set_sample_width(2)
-            sound_16k.export(file_url, format="wav")
+            sound_16k.export(final_file_url, format="wav")
 
-            # 删除临时文件
+            # 删除临时下载的文件
             if os.path.exists(temp_file):
                 os.remove(temp_file)
 
-            # -------------------------------
-            # 5. 记录缓存并返回
-            # self.__history_data.append((voice_name, style, text, file_url))
-            return file_url
+            return final_file_url
 
         except Exception as e:
-            util.log(1, "[x] 语音转换失败！")
-            util.log(1, "[x] 原因: " + str(e))
+            util.log(1, "[x] 语音转换异常！")
+            util.log(1, f"[x] 原因: {str(e)}")
             return None
