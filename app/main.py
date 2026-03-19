@@ -16,9 +16,12 @@ from app.schemas.chat import APIConfig, OllamaConfig
 from app.core.logger import log
 
 from app.core.model_registry import get_all_models
+from app.tts.xiaohu_tts import XiaoHuTTS
 
 # 生命周期管理
 sdk_instance = None  # 全局 SDK 实例
+# 实例化 TTS 服务
+xiaohu_tts_service = XiaoHuTTS()
 
 
 @asynccontextmanager
@@ -167,18 +170,25 @@ async def get_history_messages(session_id: str):
 
 @app.post("/api/message")
 async def send_message_full(req: SendMessageReq):
-    """处理发送消息请求 - 全量返回"""
+    """处理发送消息请求 - 全量返回（并尝试同步调用 TTS）"""
+    # 1. 调用大模型获取文本回复
     response_text = await sdk_instance.send_message(req.session_id, req.message)
     if not response_text:
-        return standard_response(
-            False, "Failed to send AI response message", status_code=500
-        )
-
-    return standard_response(
-        True,
-        "send message success",
-        {"session_id": req.session_id, "response": response_text},
-    )
+        return standard_response(False, "Failed to send AI response message", status_code=500)
+        
+    # 2. 判断该会话是否属于“小沪”，如果是，则请求语音合成
+    audio_url = None
+    session = await sdk_instance.get_session(req.session_id)
+    if session and "小沪" in session.model_name:
+        # 等待语音合成完毕并获取 URL
+        audio_url = await xiaohu_tts_service.generate_audio(response_text)
+        
+    # 3. 将文本和可能存在的音频链接一起返回给前端
+    return standard_response(True, "send message success", {
+        "session_id": req.session_id,
+        "response": response_text,
+        "audio_url": audio_url  # 返回音频地址
+    })
 
 
 @app.post("/api/message/async")

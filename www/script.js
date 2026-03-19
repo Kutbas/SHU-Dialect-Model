@@ -140,16 +140,16 @@ function syncSessionListScroll() {
 
 // 自动滚动到消息区域底部
 function scrollToBottom(isInstant = false) {
-    // 使用 setTimeout 留出 50ms 给浏览器计算 DOM 的实际高度（Reflow）
+    // 使用 setTimeout 的 'auto' 模式给浏览器时间计算 DOM 的实际高度
     setTimeout(() => {
         if (elements.messagesContainer) {
             // 使用现代的标准 scrollTo API，抛弃修改 CSS 的 Hack 做法
             elements.messagesContainer.scrollTo({
                 top: elements.messagesContainer.scrollHeight,
-                behavior: isInstant ? 'instant' : 'smooth'
+                behavior: isInstant ? 'auto' : 'smooth'
             });
         }
-    }, 50);
+    });
 }
 
 
@@ -275,7 +275,7 @@ async function sendMessage() {
 
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => { controller.abort(); }, 60000);
+        const timeoutId = setTimeout(() => { controller.abort(); }, 90000);
 
         // 1. 添加用户消息气泡到页面
         const userMessageId = addMessageToChat('user', message);
@@ -314,7 +314,13 @@ async function sendMessage() {
             const data = await response.json();
             if (data.success) {
                 if (currentSessionId === targetSessionId) {
+                    // 先把文本渲染上去
                     updateMessageContent(aiMessageId, data.data.response);
+
+                    // 如果后端传回了音频链接，直接挂载播放器！
+                    if (data.data.audio_url) {
+                        appendAudioPlayer(aiMessageId, data.data.audio_url);
+                    }
                 }
                 delete activeStreams[targetSessionId];
             } else {
@@ -985,4 +991,33 @@ function escapeHtml(unsafe) {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
+}
+
+// 在消息气泡底部追加一个音频播放器
+function appendAudioPlayer(messageId, audioUrl) {
+    const messageElement = document.getElementById(messageId);
+    if (!messageElement) return;
+
+    const contentDiv = messageElement.querySelector('.message-content');
+    if (!contentDiv) return;
+
+    // 创建播放器容器
+    const audioContainer = document.createElement('div');
+    audioContainer.className = 'audio-player-wrapper';
+    audioContainer.style.marginTop = '12px';
+
+    // 创建 audio 标签
+    const audioEl = document.createElement('audio');
+    audioEl.controls = true;
+    audioEl.autoplay = true; // 获取到立刻自动播放！
+    audioEl.src = audioUrl;
+    audioEl.style.height = '40px';
+    audioEl.style.width = '100%';
+    audioEl.style.outline = 'none';
+
+    audioContainer.appendChild(audioEl);
+    contentDiv.appendChild(audioContainer);
+
+    // 渲染播放器后，再次触发瞬间沉底滚动
+    scrollToBottom(true);
 }
