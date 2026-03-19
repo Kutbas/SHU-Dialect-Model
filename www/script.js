@@ -8,7 +8,8 @@ let sessions = [];
 let models = [];
 let selectedModel = null;
 let eventSource = null;
-const activeStreams = {}; // 【新增】：用于保存后台正在生成的流状态
+const activeStreams = {}; // 用于保存后台正在生成的流状态
+const sessionDrafts = {}; // 用于保存每个会话的草稿箱
 
 
 // DOM 元素
@@ -139,21 +140,16 @@ function syncSessionListScroll() {
 
 // 自动滚动到消息区域底部
 function scrollToBottom(isInstant = false) {
-    if (isInstant) {
-        // 瞬间跳转：临时用 JS 覆盖掉 CSS 的平滑滚动属性
-        elements.messagesContainer.style.scrollBehavior = 'auto';
-        elements.messagesContainer.scrollTop = elements.messagesContainer.scrollHeight;
-
-        // 在下一帧马上恢复平滑滚动，保证你发新消息时依然有丝滑的动画
-        requestAnimationFrame(() => {
-            elements.messagesContainer.style.scrollBehavior = '';
-        });
-    } else {
-        // 正常发消息时的平滑滚动
-        requestAnimationFrame(() => {
-            elements.messagesContainer.scrollTop = elements.messagesContainer.scrollHeight;
-        });
-    }
+    // 使用 setTimeout 留出 50ms 给浏览器计算 DOM 的实际高度（Reflow）
+    setTimeout(() => {
+        if (elements.messagesContainer) {
+            // 使用现代的标准 scrollTo API，抛弃修改 CSS 的 Hack 做法
+            elements.messagesContainer.scrollTo({
+                top: elements.messagesContainer.scrollHeight,
+                behavior: isInstant ? 'instant' : 'smooth'
+            });
+        }
+    }, 50);
 }
 
 
@@ -219,8 +215,17 @@ async function createNewSession() {
         const data = await response.json();
 
         if (data.success) {
+            // 保存旧会话草稿
+            if (currentSessionId) {
+                sessionDrafts[currentSessionId] = elements.messageInput.value;
+            }
+
             currentSessionId = data.data.session_id;
             currentModel = data.data.model;
+
+            // 新会话输入框必然为空，并重置字数统计
+            elements.messageInput.value = '';
+            updateCharCount();
 
             // 重新加载会话列表
             await loadSessions();
@@ -263,97 +268,78 @@ async function sendMessage() {
         return;
     }
 
-    // 【修改点1】：删除了之前这里的 if (!selectedModel) { showError('请先选择模型'); return; } 校验
-    // 只要有 currentSessionId 就可以发送消息
+    // 锁定发送时的目标会话 ID
+    const targetSessionId = currentSessionId;
 
-    // 禁用发送按钮
     elements.sendBtn.disabled = true;
 
     try {
-        // 创建AbortController用于超时控制
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => {
-            controller.abort();
-            showError('请求超时，请重试');
-        }, 60000); // 60秒超时
+        const timeoutId = setTimeout(() => { controller.abort(); }, 60000);
 
-        // 添加用户消息到聊天界面
+        // 1. 添加用户消息气泡到页面
         const userMessageId = addMessageToChat('user', message);
 
-        // 清空输入框
+        // 2. 准确清空输入框和对应草稿（【千万注意】：这里绝对不能是 messagesContainer）
         messageInput.value = '';
+        if (typeof sessionDrafts !== 'undefined') {
+            sessionDrafts[targetSessionId] = '';
+        }
+        updateCharCount();
 
-        // 添加AI消息占位符
-        const aiMessageId = addMessageToChat('assistant', '思考中...');
+        // 3. 紧接着添加 AI “思考中”气泡
+        const aiMessageId = addMessageToChat('assistant', '', true);
 
-        // 初始化当前会话的后台流状态
-        activeStreams[currentSessionId] = {
-            messageId: aiMessageId,
-            fullContent: '',
-            displayedContent: '',
-            isFinished: false
-        };
+        // 4. 【关键修复】：气泡全部塞入 DOM 后，触发沉底滚动（内部自带 50ms 等待）
+        scrollToBottom(true);
 
-        // 小沪需要用全量请求为 TTS 铺路
-        const isFullResponseModel = currentModel.includes('小沪');
+        // 5. 登记后台流状态
+        activeStreams[targetSessionId] = { messageId: aiMessageId, fullContent: '', displayedContent: '', isFinished: false };
+
+        const isFullResponseModel = currentModel && currentModel.includes('小沪');
         const endpoint = isFullResponseModel ? '/api/message' : '/api/message/async';
 
-        // 发送消息到服务器
         const response = await fetch(`${API_BASE_URL}${endpoint}`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                session_id: currentSessionId,
-                message: message
-                // 【修改点2】：移除了 model: selectedModel 字段
-                // 后端通过 session_id 就能知道当前会话绑定的是什么模型
-            }),
-            signal: controller.signal // 添加超时控制
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: targetSessionId, message: message }),
+            signal: controller.signal
         });
 
-        // 清除超时定时器
         clearTimeout(timeoutId);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        // 根据不同的模型走不同的处理逻辑
         if (isFullResponseModel) {
             // 全量响应逻辑
             const data = await response.json();
             if (data.success) {
-                // 等待后端全部生成完后，瞬间替换掉“思考中...”占位符
-                updateMessageContent(aiMessageId, data.data.response);
-                // (未来如果要接TTS，可以在这里拿到完整的 data.data.response 去发音)
-                delete activeStreams[currentSessionId]; // 清理状态
+                if (currentSessionId === targetSessionId) {
+                    updateMessageContent(aiMessageId, data.data.response);
+                }
+                delete activeStreams[targetSessionId];
             } else {
-                showError('获取回复失败: ' + data.message);
+                if (currentSessionId === targetSessionId) showError('获取回复失败: ' + data.message);
+                delete activeStreams[targetSessionId];
             }
         } else {
-            // 流式响应逻辑
-            await processStreamResponse(response, aiMessageId, currentSessionId);
+            // 原有的流式响应逻辑
+            await processStreamResponse(response, aiMessageId, targetSessionId);
         }
 
     } catch (error) {
         console.error('发送消息错误:', error);
-        if (error.name === 'AbortError') {
-            showError('请求超时，请检查网络连接或稍后重试');
-        } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
-            showError('网络连接失败，请检查服务器状态');
-        } else {
-            showError('消息发送失败，请检查网络连接');
-        }
 
-        // 移除AI消息占位符
-        const aiMessage = document.getElementById(`message-${aiMessageId}`);
-        if (aiMessage) {
-            aiMessage.remove();
+        // 发生错误时，仅清理当前会话的残留“思考中”气泡
+        if (currentSessionId === targetSessionId) {
+            const streamState = activeStreams[targetSessionId];
+            if (streamState && streamState.messageId) {
+                const aiMessage = document.getElementById(streamState.messageId);
+                if (aiMessage) aiMessage.remove();
+            }
         }
+        delete activeStreams[targetSessionId];
+
     } finally {
-        // 重新启用发送按钮
         elements.sendBtn.disabled = false;
     }
 }
@@ -464,6 +450,9 @@ async function deleteSession(sessionId) {
         const data = await response.json();
 
         if (data.success) {
+            // 清理废弃会话的草稿
+            delete sessionDrafts[sessionId];
+
             // 重新加载会话列表
             await loadSessions();
 
@@ -550,8 +539,17 @@ function renderModelGrid() {
 
 // 选择会话
 async function selectSession(session) {
+    // 在切换到新会话前，先保存当前会话输入框里的草稿
+    if (currentSessionId) {
+        sessionDrafts[currentSessionId] = elements.messageInput.value;
+    }
+
     currentSessionId = session.id;
     currentModel = session.model;
+
+    // 恢复目标会话的草稿（如果没有则赋空值），并更新字数统计
+    elements.messageInput.value = sessionDrafts[currentSessionId] || '';
+    updateCharCount();
 
     // 更新会话列表高亮
     renderSessionList();
@@ -565,11 +563,20 @@ async function selectSession(session) {
     // 【新增核心接管逻辑】：检查后台是否还有没打完的流
     const activeStream = activeStreams[session.id];
     if (activeStream && !activeStream.isFinished) {
-        // 重新挂载具有相同 ID 的聊天气泡
+        // 重新挂载具有相同 ID 的聊天气泡（传入 true 会自带“思考中...”动画）
         addMessageToChat('assistant', '', true, null, activeStream.messageId);
-        // 瞬间填入后台已经生成的进度，彻底告别 "思考中..."
-        updateMessageContent(activeStream.messageId, activeStream.displayedContent);
+
+        // 只有当 displayedContent 有内容时（流式响应），才去填入进度。
+        // 对于全量响应，此时是空字符串，跳过这一步，保留“思考中...”的动画
+        if (activeStream.displayedContent) {
+            updateMessageContent(activeStream.messageId, activeStream.displayedContent);
+        }
+
+        scrollToBottom(true);
+
     }
+
+
 }
 // 切换到聊天界面
 function switchToChatInterface() {
@@ -580,6 +587,11 @@ function switchToChatInterface() {
 
 // 切换到欢迎界面
 function switchToWelcomeInterface() {
+    // 保存当前草稿
+    if (currentSessionId) {
+        sessionDrafts[currentSessionId] = elements.messageInput.value;
+    }
+
     elements.welcomeScreen.style.display = 'flex';
     elements.chatInterface.style.display = 'none';
     currentSessionId = null;
