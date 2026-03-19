@@ -55,9 +55,19 @@ class UnifiedLLMProvider(LLMProvider):
     def get_model_desc(self) -> str:
         return self._model_desc
 
-    def _format_messages(self, messages: List[Message]) -> List[Dict[str, str]]:
+    def _format_messages(
+        self, messages: List[Message], system_prompt: str = ""
+    ) -> List[Dict[str, str]]:
         """辅助函数：将 Pydantic Message 对象转换为 litellm 需要的字典数组"""
-        return [{"role": msg.role, "content": msg.content} for msg in messages]
+        formatted = []
+        # 【新增】：如果配置了系统提示词，将其作为 system 角色悄悄置于最前端
+        if system_prompt:
+            formatted.append({"role": "system", "content": system_prompt})
+
+        formatted.extend(
+            [{"role": msg.role, "content": msg.content} for msg in messages]
+        )
+        return formatted
 
     async def send_message(
         self, messages: List[Message], request_param: Dict[str, Any]
@@ -67,12 +77,14 @@ class UnifiedLLMProvider(LLMProvider):
             log.error(f"[{self._litellm_model}] Model not available.")
             return ""
 
+        system_prompt = request_param.get("system_prompt", "")  # 获取系统提示词
+
         try:
             # 核心：acompletion 是 litellm 的异步通用接口
             # 它会自动把请求翻译成 OpenAI / Gemini / DeepSeek / Ollama 各自所需的底层格式
             response = await litellm.acompletion(
                 model=self._litellm_model,
-                messages=self._format_messages(messages),
+                messages=self._format_messages(messages, system_prompt),
                 api_key=self._api_key if self._api_key else None,
                 api_base=self._endpoint if self._endpoint else None,
                 temperature=float(request_param.get("temperature", 0.7)),
@@ -98,11 +110,13 @@ class UnifiedLLMProvider(LLMProvider):
             yield "Error: Model not available."
             return
 
+        system_prompt = request_param.get("system_prompt", "")  # 获取系统提示词
+
         try:
             # 开启 stream=True
             response_stream = await litellm.acompletion(
                 model=self._litellm_model,
-                messages=self._format_messages(messages),
+                messages=self._format_messages(messages, system_prompt),
                 api_key=self._api_key if self._api_key else None,
                 api_base=self._endpoint if self._endpoint else None,
                 temperature=float(request_param.get("temperature", 0.7)),

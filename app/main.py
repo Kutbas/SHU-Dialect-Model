@@ -15,6 +15,8 @@ from app.services.chat_sdk import ChatSDK
 from app.schemas.chat import APIConfig, OllamaConfig
 from app.core.logger import log
 
+from app.core.model_registry import get_all_models
+
 # 生命周期管理
 sdk_instance = None  # 全局 SDK 实例
 
@@ -34,36 +36,12 @@ async def lifespan(app: FastAPI):
     llm_manager = LLMManager()
     sdk_instance = ChatSDK(llm_manager, session_manager)
 
-    # 组装模型配置 (从环境变量读取 Key)
-    configs = [
-        APIConfig(
-            model_name="deepseek-chat",
-            api_key=os.getenv("deepseek_apikey", ""),
-            temperature=0.7,
-        ),
-        APIConfig(
-            model_name="gpt-4o-mini",
-            api_key=os.getenv("chatgpt_apikey", ""),
-            temperature=0.7,
-        ),
-        APIConfig(
-            model_name="gemini-2.5-flash",
-            api_key=os.getenv("gemini_apikey", ""),
-            endpoint="",
-            temperature=0.7,
-            max_tokens=8192,
-        ),
-        OllamaConfig(
-            model_name="deepseek-r1:1.5b",
-            model_desc="本地 Ollama 模型",
-            endpoint="http://192.168.71.103:11434",  # 替换为你的真实地址
-            temperature=0.7,
-        ),
-    ]
+    # 调用统一配置函数组装模型配置
+    configs = get_all_models()
 
     # 启动 SDK
     if await sdk_instance.init_models(configs):
-        log.info("ChatServer: ChatSDK 模型初始化成功!!!")
+        log.info(f"ChatServer: 成功挂载了 {len(configs)} 个模型!!!")
     else:
         log.error("ChatServer: ChatSDK 初始化失败!!!")
 

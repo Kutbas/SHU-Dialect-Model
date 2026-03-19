@@ -33,16 +33,20 @@ class ChatSDK:
         for config in configs:
             model_name = config.model_name
 
+            # 提取真实的底层模型名称
+            real_model = config.real_model if config.real_model else config.model_name
+
             # 注册 Provider
             if not self._llm_manager.is_model_available(model_name):
                 if isinstance(config, OllamaConfig):
                     provider = UnifiedLLMProvider(
-                        "ollama", model_name, config.model_desc
+                        "ollama", real_model, config.model_desc
                     )
                 else:
-                    provider_type = self._infer_provider_type(model_name)
-                    provider = UnifiedLLMProvider(provider_type, model_name)
+                    provider_type = self._infer_provider_type(real_model)
+                    provider = UnifiedLLMProvider(provider_type, real_model)
 
+                # 注册时依然使用 UI上的 model_name 映射
                 self._llm_manager.register_provider(model_name, provider)
 
             # 初始化 Provider (注入 Key 和 Endpoint)
@@ -69,7 +73,15 @@ class ChatSDK:
     async def create_session(self, model_name: str) -> str:
         if not self._initialized:
             raise RuntimeError("ChatSDK is not initialized")
-        return await self._session_manager.create_session(model_name)
+        session_id = await self._session_manager.create_session(model_name)
+
+        # 【新增】：自动插入自我介绍开场白到数据库
+        config = self._model_configs.get(model_name)
+        if config and config.greeting:
+            greeting_msg = Message(role="assistant", content=config.greeting)
+            await self._session_manager.add_message(session_id, greeting_msg)
+
+        return session_id
 
     async def get_session(self, session_id: str):
         if not self._initialized:
@@ -113,6 +125,7 @@ class ChatSDK:
         request_param = {
             "temperature": config.temperature if config else 0.7,
             "max_tokens": config.max_tokens if config else 2048,
+            "system_prompt": config.system_prompt if config else "",  # 透传给底层
         }
 
         # 调用 LLM 发送消息

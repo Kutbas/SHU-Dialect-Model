@@ -30,16 +30,26 @@ class Message(BaseModel):
 
 # 模型配置结构 (Config)
 class LLMConfig(BaseModel):
-    model_name: str
-    temperature: float = Field(
-        default=0.7, ge=0.0, le=2.0
-    )  # 还可以直接限制温度范围 0~2
+    # 注册给前端 UI 看的名字 (如: "小沪(上海话专家)")
+    model_name: str 
+    
+    # 底层实际调用的模型名称 (如: "deepseek-chat")
+    real_model: Optional[str] = None 
+    
+    # 系统人设提示词 (不存入DB，每次请求时动态拼接)
+    system_prompt: Optional[str] = "" 
+    
+    # 模型的自我介绍开场白 (创建会话时自动存入DB)
+    greeting: Optional[str] = ""
+    
+    temperature: float = Field(default=0.7, ge=0.0, le=2.0)
     max_tokens: int = 2048
 
 
 # 继承：API配置 与 Ollama 配置
 class APIConfig(LLMConfig):
     api_key: str
+    endpoint: Optional[str] = ""
 
 
 class OllamaConfig(LLMConfig):

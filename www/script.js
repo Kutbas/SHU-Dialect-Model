@@ -1,5 +1,5 @@
 // 配置
-const API_BASE_URL = 'http://192.168.71.45:60310';
+const API_BASE_URL = 'http://sdxcb.top:60310';
 
 // 全局变量
 let currentSessionId = null;
@@ -143,7 +143,7 @@ function scrollToBottom(isInstant = false) {
         // 瞬间跳转：临时用 JS 覆盖掉 CSS 的平滑滚动属性
         elements.messagesContainer.style.scrollBehavior = 'auto';
         elements.messagesContainer.scrollTop = elements.messagesContainer.scrollHeight;
-        
+
         // 在下一帧马上恢复平滑滚动，保证你发新消息时依然有丝滑的动画
         requestAnimationFrame(() => {
             elements.messagesContainer.style.scrollBehavior = '';
@@ -231,8 +231,9 @@ async function createNewSession() {
             // 关闭模型选择弹窗
             hideModelModal();
 
-            // 清空消息区域，准备新的对话
-            elements.messagesContainer.innerHTML = '';
+            // 如果有开场白，直接渲染开场白
+            const history = await loadSessionHistory(currentSessionId);
+            renderChatHistory(history);
 
             // 移除创建成功提示，避免干扰用户体验
             // showSuccess('新会话创建成功！');
@@ -285,7 +286,7 @@ async function sendMessage() {
         // 添加AI消息占位符
         const aiMessageId = addMessageToChat('assistant', '思考中...');
 
-        // 【新增】：初始化当前会话的后台流状态
+        // 初始化当前会话的后台流状态
         activeStreams[currentSessionId] = {
             messageId: aiMessageId,
             fullContent: '',
@@ -293,8 +294,12 @@ async function sendMessage() {
             isFinished: false
         };
 
+        // 小沪需要用全量请求为 TTS 铺路
+        const isFullResponseModel = currentModel.includes('小沪');
+        const endpoint = isFullResponseModel ? '/api/message' : '/api/message/async';
+
         // 发送消息到服务器
-        const response = await fetch(`${API_BASE_URL}/api/message/async`, {
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -315,8 +320,22 @@ async function sendMessage() {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        // 【修改】：把 currentSessionId 也传进去
-        await processStreamResponse(response, aiMessageId, currentSessionId);
+        // 根据不同的模型走不同的处理逻辑
+        if (isFullResponseModel) {
+            // 全量响应逻辑
+            const data = await response.json();
+            if (data.success) {
+                // 等待后端全部生成完后，瞬间替换掉“思考中...”占位符
+                updateMessageContent(aiMessageId, data.data.response);
+                // (未来如果要接TTS，可以在这里拿到完整的 data.data.response 去发音)
+                delete activeStreams[currentSessionId]; // 清理状态
+            } else {
+                showError('获取回复失败: ' + data.message);
+            }
+        } else {
+            // 流式响应逻辑
+            await processStreamResponse(response, aiMessageId, currentSessionId);
+        }
 
     } catch (error) {
         console.error('发送消息错误:', error);
@@ -369,21 +388,21 @@ async function processStreamResponse(response, messageId, sessionId) {
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-            
+
             buffer += decoder.decode(value, { stream: true });
             let lineEnd;
-            
+
             while ((lineEnd = buffer.indexOf('\n')) !== -1) {
                 const line = buffer.substring(0, lineEnd).trim();
                 buffer = buffer.substring(lineEnd + 1);
-                
+
                 if (line.startsWith('data: ')) {
                     const data = line.slice(6);
                     if (data === '[DONE]') {
                         streamState.isFinished = true;
                         return;
                     }
-                    
+
                     try {
                         // Python 直接发过来的就是 JSON 标准字符串，比如: "你好，\n世界"
                         // 直接用 JSON.parse 就能完美还原真实字符和换行符，无需任何正则替换！
@@ -604,15 +623,15 @@ function decodeUnicode(str) {
 // 添加消息到聊天界面（增加 skipScroll 参数）
 function addMessageToChat(role, content, isStreaming = false, timestamp = null, forceId = null, skipScroll = false) {
     const messageId = forceId || ('msg-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9));
-    
+
     const messageElement = document.createElement('div');
     messageElement.className = `message ${role}`;
     messageElement.id = messageId;
-    
+
     const avatar = role === 'user' ? '<i class="fas fa-user"></i>' : '<i class="fas fa-robot"></i>';
     const time = timestamp ? formatTime(timestamp) : formatTime(Date.now());
-    
-    
+
+
     messageElement.innerHTML = `
         <div class="message-avatar">${avatar}</div>
         <div class="message-content">
@@ -620,7 +639,7 @@ function addMessageToChat(role, content, isStreaming = false, timestamp = null, 
             <div class="message-time">${time}</div>
         </div>
     `;
-    
+
     // 为非流式消息添加代码块复制功能
     if (!isStreaming) {
         const messageTextElement = messageElement.querySelector('.message-text');
@@ -630,14 +649,14 @@ function addMessageToChat(role, content, isStreaming = false, timestamp = null, 
             highlightCodeBlocks(messageTextElement);
         }
     }
-    
+
     elements.messagesContainer.appendChild(messageElement);
-    
+
     // 【修改点】：如果指定了 skipScroll 为 true，这里就不触发滚动
     if (!isStreaming && !skipScroll) {
         scrollToBottom();
     }
-    
+
     return messageId;
 }
 
