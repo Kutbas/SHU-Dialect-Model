@@ -1,5 +1,5 @@
 // 配置
-const API_BASE_URL = 'http://sdxcb.top:60310';
+const API_BASE_URL = 'http://192.168.71.45:60310';
 
 // 全局变量
 let currentSessionId = null;
@@ -10,6 +10,9 @@ let selectedModel = null;
 let eventSource = null;
 const activeStreams = {}; // 用于保存后台正在生成的流状态
 const sessionDrafts = {}; // 用于保存每个会话的草稿箱
+let mediaRecorder = null;
+let audioChunks = [];
+let isRecording = false;
 
 
 // DOM 元素
@@ -28,7 +31,8 @@ const elements = {
     closeModal: document.getElementById('closeModal'),
     cancelBtn: document.getElementById('cancelBtn'),
     confirmBtn: document.getElementById('confirmBtn'),
-    loadingOverlay: document.getElementById('loadingOverlay')
+    loadingOverlay: document.getElementById('loadingOverlay'),
+    recordBtn: document.getElementById('recordBtn')
 };
 
 // 初始化应用
@@ -96,6 +100,10 @@ function setupEventListeners() {
 
     // 发送按钮
     elements.sendBtn.addEventListener('click', sendMessage);
+    // 录音按钮点击事件
+    if (elements.recordBtn) {
+        elements.recordBtn.addEventListener('click', toggleRecording);
+    }
 
     // 模型选择弹窗
     elements.closeModal.addEventListener('click', hideModelModal);
@@ -1020,4 +1028,133 @@ function appendAudioPlayer(messageId, audioUrl) {
 
     // 渲染播放器后，再次触发瞬间沉底滚动
     scrollToBottom(true);
+}
+
+// ==========================================
+// 语音识别 (ASR) 核心逻辑
+// ==========================================
+
+// 切换录音状态
+async function toggleRecording() {
+    if (!currentSessionId) {
+        showError('请先选择或创建会话');
+        return;
+    }
+
+    if (isRecording) {
+        stopRecording();
+    } else {
+        await startRecording();
+    }
+}
+
+// 开始录音
+async function startRecording() {
+    try {
+        // 请求麦克风权限
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+
+        // 收集音频数据片段
+        mediaRecorder.addEventListener('dataavailable', event => {
+            if (event.data.size > 0) {
+                audioChunks.push(event.data);
+            }
+        });
+
+        // 停止录音时，触发发送逻辑
+        mediaRecorder.addEventListener('stop', async () => {
+            // 将片段打包成 Blob 文件 (通常为 webm 或 ogg 格式)
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+
+            // 释放麦克风资源
+            stream.getTracks().forEach(track => track.stop());
+
+            // 提交给后端识别
+            await sendAudioToServer(audioBlob);
+        });
+
+        // 启动录制
+        mediaRecorder.start();
+        isRecording = true;
+
+        // 更新 UI 为正在录音状态
+        elements.recordBtn.classList.add('recording');
+        elements.recordBtn.innerHTML = '<i class="fas fa-stop"></i>';
+        elements.recordBtn.title = "点击结束录音";
+        elements.messageInput.placeholder = '正在录音... 点击红色方块结束';
+        elements.messageInput.disabled = true;
+
+    } catch (err) {
+        console.error('麦克风调用失败:', err);
+
+        // 【优化错误提示，准确定位原因】
+        if (err.name === 'NotAllowedError' || err.name === 'SecurityError') {
+            showError('麦克风被拒绝。如果是通过 HTTP 协议非本地访问，浏览器会出于安全限制拦截麦克风。请使用 localhost 或 HTTPS 访问！');
+        } else if (err.name === 'NotFoundError') {
+            showError('未检测到麦克风设备，请检查硬件连接！');
+        } else {
+            showError('无法访问麦克风: ' + err.message);
+        }
+    }
+}
+
+// 停止录音
+function stopRecording() {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+    }
+    isRecording = false;
+
+    // 更新 UI 为正在识别状态
+    elements.recordBtn.classList.remove('recording');
+    elements.recordBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    elements.recordBtn.title = "正在识别语音...";
+    elements.messageInput.placeholder = '正在翻译成文字...';
+}
+
+// 发送音频至后端 ASR 接口
+async function sendAudioToServer(audioBlob) {
+    const formData = new FormData();
+    // 添加文件对象，名称为 file
+    formData.append('file', audioBlob, 'recording.webm');
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/audio/recognize`, {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            let recognizedText = data.data.text;
+
+            // 【数据清洗】：处理返回内容中的 "上海话：xxx \n普通话：失败..."
+            if (recognizedText.includes("上海话：")) {
+                recognizedText = recognizedText.split("普通话：")[0].replace("上海话：", "").trim();
+            }
+
+            if (recognizedText) {
+                // 将纯净文本填入输入框
+                elements.messageInput.value = recognizedText;
+
+                // 【无缝衔接】：直接调用文字发送接口！
+                sendMessage();
+            } else {
+                showError("未能识别出有效的语音内容");
+            }
+        } else {
+            showError('语音识别失败: ' + data.message);
+        }
+    } catch (error) {
+        console.error('语音识别请求错误:', error);
+        showError('语音识别网络错误，请稍后重试');
+    } finally {
+        // 恢复 UI 初始状态
+        elements.recordBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+        elements.recordBtn.title = "点击开始语音输入";
+        elements.messageInput.placeholder = '输入消息...';
+        elements.messageInput.disabled = false;
+    }
 }

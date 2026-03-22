@@ -18,15 +18,22 @@ from app.core.logger import log
 from app.core.model_registry import get_all_models
 from app.tts.xiaohu_tts import XiaoHuTTS
 
+import shutil
+import tempfile
+from fastapi import File, UploadFile  # 【新增】处理文件上传
+from app.asr.shanghai_asr import ShanghaiASR  # 【新增】引入 ASR 模块
+
 # 生命周期管理
 sdk_instance = None  # 全局 SDK 实例
 # 实例化 TTS 服务
 xiaohu_tts_service = XiaoHuTTS()
+# 实例化 ASR 服务
+asr_service = ShanghaiASR()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global sdk_instance
+    global sdk_instance, asr_instance
     log.info("ChatServer: 正在初始化数据库与 ChatSDK...")
 
     # 初始化数据库
@@ -47,6 +54,9 @@ async def lifespan(app: FastAPI):
         log.info(f"ChatServer: 成功挂载了 {len(configs)} 个模型!!!")
     else:
         log.error("ChatServer: ChatSDK 初始化失败!!!")
+
+    # 预热 ASR 客户端 (扔到后台线程执行，不阻塞 FastAPI 启动)
+    asyncio.create_task(asyncio.to_thread(asr_service.init_client_sync))
 
     yield  # 将控制权交还给 FastAPI，服务器正式开始接收请求
 
@@ -174,21 +184,27 @@ async def send_message_full(req: SendMessageReq):
     # 1. 调用大模型获取文本回复
     response_text = await sdk_instance.send_message(req.session_id, req.message)
     if not response_text:
-        return standard_response(False, "Failed to send AI response message", status_code=500)
-        
+        return standard_response(
+            False, "Failed to send AI response message", status_code=500
+        )
+
     # 2. 判断该会话是否属于“小沪”，如果是，则请求语音合成
     audio_url = None
     session = await sdk_instance.get_session(req.session_id)
     if session and "小沪" in session.model_name:
         # 等待语音合成完毕并获取 URL
         audio_url = await xiaohu_tts_service.generate_audio(response_text)
-        
+
     # 3. 将文本和可能存在的音频链接一起返回给前端
-    return standard_response(True, "send message success", {
-        "session_id": req.session_id,
-        "response": response_text,
-        "audio_url": audio_url  # 返回音频地址
-    })
+    return standard_response(
+        True,
+        "send message success",
+        {
+            "session_id": req.session_id,
+            "response": response_text,
+            "audio_url": audio_url,  # 返回音频地址
+        },
+    )
 
 
 @app.post("/api/message/async")
@@ -224,6 +240,41 @@ async def send_message_stream(req: SendMessageReq):
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
     )
+
+
+@app.post("/api/audio/recognize")
+async def recognize_audio_api(file: UploadFile = File(...)):
+    """处理前端发送的语音识别请求"""
+    if not file:
+        return standard_response(False, "未接收到音频文件", status_code=400)
+
+    try:
+        # 1. 提取后缀 (前端录音通常是 .webm, .ogg 或 .wav)
+        ext = os.path.splitext(file.filename)[1]
+        if not ext:
+            ext = ".webm"  # 浏览器 MediaRecorder 默认常用后缀
+
+        # 2. 将上传的音频流保存为服务器的本地临时文件
+        with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+            shutil.copyfileobj(file.file, tmp)
+            tmp_path = tmp.name
+
+        # 3. 调用 ASR 模块进行识别
+        recognized_text = await asr_service.recognize_audio(tmp_path)
+
+        # 4. 识别完成后，清理临时文件，防止塞满硬盘
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
+        # 5. 返回结果
+        if recognized_text and "识别请求发生错误" not in recognized_text:
+            return standard_response(True, "语音识别成功", {"text": recognized_text})
+        else:
+            return standard_response(False, "无法识别出文字或服务出错", status_code=500)
+
+    except Exception as e:
+        log.error(f"处理语音文件出错: {e}")
+        return standard_response(False, f"服务器内部错误: {str(e)}", status_code=500)
 
 
 # 挂载前端静态资源 (必须放在最后面，防止拦截 /api 路由)
