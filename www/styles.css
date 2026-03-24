@@ -1011,7 +1011,8 @@ body {
 
 /* 录音按钮基础样式 */
 .record-btn {
-    background-color: transparent; /* 或者你喜欢的颜色 */
+    background-color: transparent;
+    /* 或者你喜欢的颜色 */
     color: #475569;
     border: none;
     border-radius: 50%;
@@ -1038,7 +1039,98 @@ body {
 }
 
 @keyframes pulse-record {
-    0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
-    70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    0% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+    }
+
+    70% {
+        box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    }
+}
+
+/* 录音包裹器：相对定位，作为绝对定位菜单的锚点 */
+.record-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+/* 悬浮菜单的样式 */
+.asr-dropdown {
+    position: absolute;
+    bottom: 120%;
+    /* 绝对定位在麦克风按钮的正上方 */
+    left: 50%;
+    transform: translateX(-50%) translateY(10px);
+    background-color: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    padding: 6px;
+    min-width: 120px;
+    z-index: 100;
+
+    /* 核心动画与显隐控制 */
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    /* 隐藏时不可点击，防止挡住其他元素 */
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 添加一个指向下方的小三角指示器 */
+.asr-dropdown::after {
+    content: '';
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+    width: 10px;
+    height: 10px;
+    background-color: white;
+    border-right: 1px solid #e2e8f0;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+/* 当鼠标悬浮在 wrapper 上时，显示菜单 */
+.record-wrapper:hover .asr-dropdown {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+    pointer-events: auto;
+    /* 显示时恢复点击能力 */
+}
+
+/* 菜单选项样式 */
+.asr-option {
+    padding: 8px 12px;
+    font-size: 13px;
+    color: #475569;
+    cursor: pointer;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background-color 0.2s;
+    user-select: none;
+}
+
+.asr-option:hover {
+    background-color: #f1f5f9;
+    color: #3b82f6;
+}
+
+/* 选中状态的高亮 */
+.asr-option.active {
+    color: #3b82f6;
+    font-weight: bold;
+    background-color: #eff6ff;
+}
+
+.asr-option i {
+    font-size: 12px;
 }

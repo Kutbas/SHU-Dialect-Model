@@ -65,11 +65,28 @@
                             <div class="input-footer">
                                 <span class="char-count" id="charCount">0/2000</span>
 
-                                <!-- 新增一个专属容器把右边的两个按钮包起来 -->
+                                <!-- 右侧按钮组 -->
                                 <div class="right-buttons" style="display: flex; gap: 10px; align-items: center;">
-                                    <button id="recordBtn" class="record-btn" title="点击开始语音输入">
-                                        <i class="fas fa-microphone"></i>
-                                    </button>
+
+                                    <!-- 录音按钮的包裹容器，用于定位悬浮菜单 -->
+                                    <div class="record-wrapper">
+                                        <button id="recordBtn" class="record-btn" title="点击开始语音输入">
+                                            <i class="fas fa-microphone"></i>
+                                        </button>
+
+                                        <!-- 悬浮的 ASR 模型选择菜单 -->
+                                        <div class="asr-dropdown">
+                                            <!-- 默认选中上海话 -->
+                                            <div class="asr-option active" data-asr="shanghai">
+                                                <i class="fas fa-check"></i> 上海话
+                                            </div>
+                                            <!-- 阿里云普通话 -->
+                                            <div class="asr-option" data-asr="ali">
+                                                <i class="fas fa-check" style="visibility: hidden;"></i> 中英混合
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <button class="send-btn" id="sendBtn">
                                         <i class="fas fa-paper-plane"></i>
                                         发送

@@ -20,15 +20,17 @@ from app.tts.xiaohu_tts import XiaoHuTTS
 
 import shutil
 import tempfile
-from fastapi import File, UploadFile  # 【新增】处理文件上传
-from app.asr.shanghai_asr import ShanghaiASR  # 【新增】引入 ASR 模块
+from fastapi import File, UploadFile, Form  # 处理文件上传
+from app.asr.shanghai_asr import ShanghaiASR  # 引入沪语 ASR 模块
+from app.asr.ali_asr import AliASR  # 引入阿里云 ASR 模块
 
 # 生命周期管理
 sdk_instance = None  # 全局 SDK 实例
 # 实例化 TTS 服务
 xiaohu_tts_service = XiaoHuTTS()
 # 实例化 ASR 服务
-asr_service = ShanghaiASR()
+asr_shanghai_service = ShanghaiASR()
+asr_ali_service = AliASR()
 
 
 @asynccontextmanager
@@ -56,7 +58,7 @@ async def lifespan(app: FastAPI):
         log.error("ChatServer: ChatSDK 初始化失败!!!")
 
     # 预热 ASR 客户端 (扔到后台线程执行，不阻塞 FastAPI 启动)
-    asyncio.create_task(asyncio.to_thread(asr_service.init_client_sync))
+    asyncio.create_task(asyncio.to_thread(asr_shanghai_service.init_client_sync))
 
     yield  # 将控制权交还给 FastAPI，服务器正式开始接收请求
 
@@ -243,30 +245,55 @@ async def send_message_stream(req: SendMessageReq):
 
 
 @app.post("/api/audio/recognize")
-async def recognize_audio_api(file: UploadFile = File(...)):
+async def recognize_audio_api(
+    file: UploadFile = File(...),
+    asr_model: str = Form(
+        "shanghai"
+    ),  # 前端传入的 ASR 模型标识，默认为 "shanghai"
+):
     """处理前端发送的语音识别请求"""
     if not file:
         return standard_response(False, "未接收到音频文件", status_code=400)
 
     try:
-        # 1. 提取后缀 (前端录音通常是 .webm, .ogg 或 .wav)
-        ext = os.path.splitext(file.filename)[1]
-        if not ext:
-            ext = ".webm"  # 浏览器 MediaRecorder 默认常用后缀
-
-        # 2. 将上传的音频流保存为服务器的本地临时文件
+        # 将上传的音频流保存为服务器的本地临时文件
+        ext = os.path.splitext(file.filename)[1] or ".webm"
         with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
             shutil.copyfileobj(file.file, tmp)
             tmp_path = tmp.name
 
-        # 3. 调用 ASR 模块进行识别
-        recognized_text = await asr_service.recognize_audio(tmp_path)
+        # 根据前端请求的模型标识，路由分发并转码
+        recognized_text = ""
 
-        # 4. 识别完成后，清理临时文件，防止塞满硬盘
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
+        try:
+            if asr_model == "ali":
+                # 将任意格式转换为 16kHz单声道 wav
+                import pydub
 
-        # 5. 返回结果
+                wav_path = tmp_path + ".wav"
+
+                audio = pydub.AudioSegment.from_file(tmp_path)
+                # 强转配置
+                audio = audio.set_frame_rate(16000).set_channels(1).set_sample_width(2)
+                audio.export(wav_path, format="wav")
+
+                # 请求阿里接口
+                recognized_text = await asr_ali_service.recognize_audio(wav_path)
+
+                # 用完清理专属转码文件
+                if os.path.exists(wav_path):
+                    os.remove(wav_path)
+
+            else:
+                # 默认使用原有的上海话 ASR 接口
+                recognized_text = await asr_shanghai_service.recognize_audio(tmp_path)
+
+        finally:
+            # 无论成功失败，确保原始临时上传文件被清理
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
+        # 结果判断与清洗返回
         if recognized_text and "识别请求发生错误" not in recognized_text:
             return standard_response(True, "语音识别成功", {"text": recognized_text})
         else:

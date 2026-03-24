@@ -13,6 +13,7 @@ const sessionDrafts = {}; // 用于保存每个会话的草稿箱
 let mediaRecorder = null;
 let audioChunks = [];
 let isRecording = false;
+let currentAsrModel = 'shanghai'; // 默认使用上海话 ASR
 
 
 // DOM 元素
@@ -119,6 +120,28 @@ function setupEventListeners() {
 
     // 滚动同步：消息区域滚动时同步会话列表
     elements.messagesContainer.addEventListener('scroll', syncSessionListScroll);
+
+    // ASR 引擎选择下拉菜单点击事件
+    document.querySelectorAll('.asr-option').forEach(option => {
+        option.addEventListener('click', (e) => {
+            e.stopPropagation(); // 阻止冒泡
+
+            // 1. 获取选中的引擎标识 ("shanghai" 或 "ali")
+            currentAsrModel = option.getAttribute('data-asr');
+
+            // 2. 更新 UI：移除所有选项的选中状态和打勾图标
+            document.querySelectorAll('.asr-option').forEach(opt => {
+                opt.classList.remove('active');
+                opt.querySelector('i').style.visibility = 'hidden';
+            });
+
+            // 3. 为当前点击的项加上状态和打勾图标
+            option.classList.add('active');
+            option.querySelector('i').style.visibility = 'visible';
+
+            console.log("当前 ASR 引擎已切换为:", currentAsrModel);
+        });
+    });
 }
 
 // 滚动同步函数
@@ -1120,6 +1143,9 @@ async function sendAudioToServer(audioBlob) {
     // 添加文件对象，名称为 file
     formData.append('file', audioBlob, 'recording.webm');
 
+    // 把当前选择的 ASR 模型标识传给后端！
+    formData.append('asr_model', currentAsrModel);
+
     try {
         const response = await fetch(`${API_BASE_URL}/api/audio/recognize`, {
             method: 'POST',
@@ -1130,16 +1156,14 @@ async function sendAudioToServer(audioBlob) {
         if (data.success) {
             let recognizedText = data.data.text;
 
-            // 【数据清洗】：处理返回内容中的 "上海话：xxx \n普通话：失败..."
+            // 阿里返回的纯文本没有“上海话：”前缀，我们要兼容它
             if (recognizedText.includes("上海话：")) {
                 recognizedText = recognizedText.split("普通话：")[0].replace("上海话：", "").trim();
             }
 
             if (recognizedText) {
-                // 将纯净文本填入输入框
                 elements.messageInput.value = recognizedText;
-
-                // 【无缝衔接】：直接调用文字发送接口！
+                // 无缝衔接：直接调用文字发送接口
                 sendMessage();
             } else {
                 showError("未能识别出有效的语音内容");
