@@ -1,5 +1,5 @@
 // 配置
-const API_BASE_URL = 'http://192.168.71.45:60310';
+const API_BASE_URL = '';
 
 // 全局变量
 let currentSessionId = null;
