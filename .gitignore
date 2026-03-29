@@ -130,3 +130,6 @@ dmypy.json
 samples/
 system.conf
 cache_data/*.wav
+
+chat.db
+certs
