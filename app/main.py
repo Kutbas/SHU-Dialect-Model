@@ -3,10 +3,12 @@ import json
 import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+import httpx
+import urllib.parse
 
 from app.db.data_manager import DataManager
 from app.services.session_manager import SessionManager
@@ -24,6 +26,8 @@ from fastapi import File, UploadFile, Form  # 处理文件上传
 from app.asr.shanghai_asr import ShanghaiASR  # 引入沪语 ASR 模块
 from app.asr.ali_asr import AliASR  # 引入阿里云 ASR 模块
 
+from app.core.config import settings
+
 # 生命周期管理
 sdk_instance = None  # 全局 SDK 实例
 # 实例化 TTS 服务
@@ -39,8 +43,7 @@ async def lifespan(app: FastAPI):
     log.info("ChatServer: 正在初始化数据库与 ChatSDK...")
 
     # 初始化数据库
-    # 注意：在实际生产中，数据库 URL 应该写在 .env 配置文件里
-    db_manager = DataManager("sqlite+aiosqlite:///./chat.db")
+    db_manager = DataManager(settings.DATABASE_URL)
     await db_manager.init_database()
 
     # 实例化 Managers
@@ -183,21 +186,27 @@ async def get_history_messages(session_id: str):
 @app.post("/api/message")
 async def send_message_full(req: SendMessageReq):
     """处理发送消息请求 - 全量返回（并尝试同步调用 TTS）"""
-    # 1. 调用大模型获取文本回复
+    # 调用大模型获取文本回复
     response_text = await sdk_instance.send_message(req.session_id, req.message)
     if not response_text:
         return standard_response(
             False, "Failed to send AI response message", status_code=500
         )
 
-    # 2. 判断该会话是否属于“小沪”，如果是，则请求语音合成
+    # 判断该会话是否属于“小沪”，如果是，则请求语音合成
     audio_url = None
     session = await sdk_instance.get_session(req.session_id)
     if session and "小沪" in session.model_name:
-        # 等待语音合成完毕并获取 URL
-        audio_url = await xiaohu_tts_service.generate_audio(response_text)
+        # 获取原始的 HTTP 链接
+        raw_audio_url = await xiaohu_tts_service.generate_audio(response_text)
 
-    # 3. 将文本和可能存在的音频链接一起返回给前端
+        if raw_audio_url:
+            # 【关键修改】：将 HTTP 外部链接进行 URL 编码，包装成我们的内部代理路径
+            encoded_url = urllib.parse.quote(raw_audio_url, safe="")
+            # 因为前端 script.js 使用相对路径，这里直接返回 /api/... 即可
+            audio_url = f"/api/audio/proxy?url={encoded_url}"
+
+    # 将文本和可能存在的音频链接一起返回给前端
     return standard_response(
         True,
         "send message success",
@@ -247,9 +256,7 @@ async def send_message_stream(req: SendMessageReq):
 @app.post("/api/audio/recognize")
 async def recognize_audio_api(
     file: UploadFile = File(...),
-    asr_model: str = Form(
-        "shanghai"
-    ),  # 前端传入的 ASR 模型标识，默认为 "shanghai"
+    asr_model: str = Form("shanghai"),  # 前端传入的 ASR 模型标识，默认为 "shanghai"
 ):
     """处理前端发送的语音识别请求"""
     if not file:
@@ -302,6 +309,30 @@ async def recognize_audio_api(
     except Exception as e:
         log.error(f"处理语音文件出错: {e}")
         return standard_response(False, f"服务器内部错误: {str(e)}", status_code=500)
+
+
+@app.get("/api/audio/proxy")
+async def proxy_audio(url: str):
+    """
+    音频代理接口：解决 HTTPS 网站无法直接播放 HTTP 音频的混合内容 (Mixed Content) 拦截问题
+    """
+    # 安全校验：防止被恶意利用当作开放代理
+    if not url.startswith(settings.TTS_API_BASE):
+        raise HTTPException(status_code=403, detail="Forbidden URL")
+
+    try:
+        # 由后端代为向 HTTP 的 TTS 服务器请求音频文件数据
+        # 加上 trust_env=False 绕过系统代理
+        async with httpx.AsyncClient(trust_env=False, timeout=60.0) as client:
+            resp = await client.get(url)
+            resp.raise_for_status()
+
+            # 拿到二进制音频数据后，作为本机的 HTTPS 流量返回给前端
+            return Response(content=resp.content, media_type="audio/wav")
+
+    except Exception as e:
+        log.error(f"代理音频失败: {e}")
+        raise HTTPException(status_code=500, detail="Audio proxy failed")
 
 
 # 挂载前端静态资源 (必须放在最后面，防止拦截 /api 路由)

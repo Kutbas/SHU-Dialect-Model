@@ -3,14 +3,23 @@ import asyncio
 import traceback
 from gradio_client import Client
 from app.core.logger import log
+from app.core.config import settings
+import urllib.parse
 
-# 强制将 ASR 服务器 IP 加入直连白名单，禁止它走全局 SOCKS 代理
-os.environ["NO_PROXY"] = os.environ.get("NO_PROXY", "") + ",202.120.117.242"
-os.environ["no_proxy"] = os.environ.get("no_proxy", "") + ",202.120.117.242"
+# 动态提取上海话 ASR 网址的 IP/域名，加入直连白名单
+try:
+    parsed_url = urllib.parse.urlparse(settings.SHANGHAI_ASR_URL)
+    host = parsed_url.hostname
+    if host:
+        os.environ["NO_PROXY"] = os.environ.get("NO_PROXY", "") + f",{host}"
+        os.environ["no_proxy"] = os.environ.get("no_proxy", "") + f",{host}"
+except Exception:
+    pass
+
 
 class ShanghaiASR:
-    def __init__(self, url="http://202.120.117.242:7860/"):
-        self.url = url
+    def __init__(self, url: str = None):
+        self.url = url or settings.SHANGHAI_ASR_URL
         self.client = None
         log.info(f"ShanghaiASR: 准备连接到 ASR 服务: {self.url} ...")
 

@@ -1,6 +1,7 @@
 import os
 from typing import List, Union
 from app.schemas.chat import APIConfig, OllamaConfig
+from app.core.config import settings
 
 # 集中管理所有提示词
 XIAOHU_PROMPT = """你是一位精通上海话的专家，来自上海大学，你叫“小沪”。你的任务是与用户进行上海话的对话互动。
@@ -24,14 +25,14 @@ def get_all_models() -> List[Union[APIConfig, OllamaConfig]]:
         # 基础大模型 - DeepSeek
         APIConfig(
             model_name="deepseek-chat",
-            api_key=os.getenv("deepseek_apikey", ""),
+            api_key=settings.DEEPSEEK_API_KEY,
             temperature=0.7,
         ),
         # 提示词封装模型 - 小沪 (基于 DeepSeek)
         APIConfig(
             model_name="小沪(上海话专家)",
             real_model="deepseek-chat",  # 底层引擎
-            api_key=os.getenv("deepseek_apikey", ""),
+            api_key=settings.DEEPSEEK_API_KEY,
             system_prompt=XIAOHU_PROMPT,  # 注入人设
             greeting="侬好！我是上海大学的小沪，很高兴和侬用上海话聊天。有什么我可以帮侬的吗？",
             temperature=0.7,
@@ -39,13 +40,13 @@ def get_all_models() -> List[Union[APIConfig, OllamaConfig]]:
         # 基础大模型 - ChatGPT
         APIConfig(
             model_name="gpt-4o-mini",
-            api_key=os.getenv("chatgpt_apikey", ""),
+            api_key=settings.CHATGPT_API_KEY,
             temperature=0.7,
         ),
         # 基础大模型 - Gemini
         APIConfig(
             model_name="gemini-2.5-flash",
-            api_key=os.getenv("gemini_apikey", ""),
+            api_key=settings.GEMINI_API_KEY,
             endpoint="",
             temperature=0.7,
             max_tokens=8192,
@@ -54,7 +55,7 @@ def get_all_models() -> List[Union[APIConfig, OllamaConfig]]:
         OllamaConfig(
             model_name="deepseek-r1:1.5b",
             model_desc="本地 Ollama 模型",
-            endpoint="http://192.168.71.103:11434",
+            endpoint=settings.OLLAMA_ENDPOINT,
             temperature=0.7,
         ),
     ]

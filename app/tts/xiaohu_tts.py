@@ -1,11 +1,12 @@
 import httpx
 from typing import Optional
 from app.core.logger import log
+from app.core.config import settings
 
 
 class XiaoHuTTS:
     def __init__(self):
-        self.api_base = "http://202.120.117.242:23456"
+        self.api_base = settings.TTS_API_BASE
         self.model = "mix_G_71000.pth"
         self.lang = "ZH"
         self.emotion = "Neutral"

@@ -4,10 +4,11 @@ import asyncio
 import traceback
 import nls
 from app.core.logger import log
+from app.core.config import settings
 
-URL = "wss://nls-gateway-cn-shanghai.aliyuncs.com/ws/v1"
-APPKEY = "JwPD598XOpL98bYm"
-TOKEN = "bdf7d89ea9d64cc7a5374986eb5bb207"
+URL = settings.ALI_ASR_URL
+APPKEY = settings.ALI_ASR_APPKEY
+TOKEN = settings.ALI_ASR_TOKEN
 
 
 class AliASRTask:
@@ -59,7 +60,7 @@ class AliASRTask:
             # 使用更安全的分块方式，绝不丢弃尾部音频字节！
             chunk_size = 3200  # 每次发送 3200 字节 (约 100ms 音频)
             for i in range(0, len(data), chunk_size):
-                sr.send_audio(data[i:i+chunk_size])
+                sr.send_audio(data[i : i + chunk_size])
                 time.sleep(0.01)
 
             # 发送完成，阻塞等待最终结果返回
