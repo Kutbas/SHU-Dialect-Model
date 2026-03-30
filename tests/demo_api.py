@@ -189,7 +189,7 @@ if __name__ == "__main__":
 
     # 【请在此处填入用于测试的本地音频文件路径】
     # 比如自己录制一段 wav 或 mp3 用于测试
-    TEST_AUDIO_FILE = "demo.wav"
+    TEST_AUDIO_FILE = "/home/frioi/data_share/Projects/SHU-Dialect-Model/tests/test.mp3"
 
     # 样例 1: 直接调用 TTS
     print("\n" + "=" * 40 + "\n样例 1: 原生 TTS 接口调用\n" + "=" * 40)
