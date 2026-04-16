@@ -1,0 +1,32 @@
+{
+	"Version": 3,
+	"FileReferences": {
+		"Moc": "LOADING.moc3",
+		"Textures": [
+			"LOADING.1024/texture_00.png"
+		],
+		"Physics": "LOADING.physics3.json",
+		"DisplayInfo": "LOADING.cdi3.json",
+		"Motions": {
+			"Idle": [
+				{
+					"File": "motions/Scene1.motion3.json",
+					"FadeInTime": 0.5,
+					"FadeOutTime": 0.5
+				}
+			]
+		}
+	},
+	"Groups": [
+		{
+			"Target": "Parameter",
+			"Name": "EyeBlink",
+			"Ids": []
+		},
+		{
+			"Target": "Parameter",
+			"Name": "LipSync",
+			"Ids": []
+		}
+	]
+}
