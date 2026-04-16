@@ -1,0 +1,194 @@
+:root {
+  --live2d-stage-width: clamp(210px, 18vw, 290px);
+  --live2d-stage-gap: clamp(18px, 2vw, 30px);
+  --live2d-bottom: clamp(84px, 8.5vh, 110px);
+  --live2d-width: clamp(180px, 15vw, 260px);
+  --live2d-height: clamp(255px, 22vw, 360px);
+  --live2d-stage-center-right: max(8px, calc((var(--live2d-stage-width) - var(--live2d-width)) / 2));
+  --live2d-optical-shift: clamp(56px, 4vw, 74px);
+  --live2d-right: calc(var(--live2d-stage-center-right) + var(--live2d-optical-shift));
+}
+
+.container.theme-xiaohu .chat-interface,
+.container.theme-xiaohu .welcome-screen {
+  padding-right: calc(var(--live2d-stage-width) + var(--live2d-stage-gap));
+}
+
+.container.theme-xiaohu .messages-container {
+  padding-right: 24px;
+}
+
+.container.theme-xiaohu .input-area {
+  padding-right: 0;
+}
+
+.container.theme-xiaohu .input-container {
+  max-width: min(800px, calc(100% - 16px));
+  margin-left: 0;
+  margin-right: auto;
+}
+
+#live2d-shell {
+  position: fixed;
+  right: var(--live2d-right);
+  bottom: var(--live2d-bottom);
+  width: min(var(--live2d-width), calc(100vw - 16px));
+  height: min(var(--live2d-height), calc(100vh - 168px));
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(18px) scale(0.96);
+  transform-origin: bottom right;
+  transition:
+    opacity 0.28s ease,
+    transform 0.28s ease,
+    visibility 0.28s ease;
+  pointer-events: none;
+  z-index: 24;
+  overflow: visible;
+}
+
+#live2d-shell::before,
+#live2d-shell::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  inset: auto;
+  z-index: 0;
+}
+
+#live2d-shell.is-active {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+}
+
+#live2d-shell::before {
+  left: 10%;
+  right: 8%;
+  bottom: 11%;
+  height: 58%;
+  background:
+    radial-gradient(circle at 50% 38%, rgba(255, 255, 255, 0.22), rgba(168, 131, 255, 0.18) 32%, rgba(88, 124, 255, 0.12) 54%, rgba(35, 18, 71, 0) 76%);
+  filter: blur(22px);
+  opacity: 0.92;
+}
+
+#live2d-shell::after {
+  left: 18%;
+  right: 14%;
+  bottom: 3%;
+  height: 12%;
+  background: radial-gradient(circle at 50% 50%, rgba(18, 24, 38, 0.34), rgba(18, 24, 38, 0.18) 35%, rgba(18, 24, 38, 0) 72%);
+  filter: blur(18px);
+  transform: translateY(6px);
+}
+
+#live2d-frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  pointer-events: auto;
+  position: relative;
+  z-index: 1;
+  overflow: visible;
+}
+
+#live2d-bubble {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  max-width: min(320px, 40vw);
+  min-width: 200px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  box-shadow:
+    0 16px 34px rgba(34, 25, 71, 0.18),
+    0 6px 12px rgba(34, 25, 71, 0.1);
+  backdrop-filter: blur(12px);
+  color: #30234d;
+  opacity: 0;
+  visibility: hidden;
+  transform: translate3d(-50%, 12px, 0) scale(0.96);
+  transform-origin: center bottom;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease,
+    visibility 0.2s ease;
+  pointer-events: none;
+  z-index: 2;
+}
+
+#live2d-bubble::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -8px;
+  width: 18px;
+  height: 18px;
+  background: inherit;
+  border-right: inherit;
+  border-bottom: inherit;
+  transform: translateX(-50%) rotate(45deg);
+  border-bottom-right-radius: 4px;
+}
+
+#live2d-bubble.is-visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translate3d(-50%, 0, 0) scale(1);
+}
+
+.live2d-bubble__content {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.6;
+  letter-spacing: 0.01em;
+  word-break: break-word;
+  writing-mode: horizontal-tb;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  :root {
+    --live2d-stage-width: 220px;
+    --live2d-stage-gap: 18px;
+    --live2d-bottom: 108px;
+    --live2d-width: 205px;
+    --live2d-height: 290px;
+    --live2d-stage-center-right: max(8px, calc((var(--live2d-stage-width) - var(--live2d-width)) / 2));
+    --live2d-optical-shift: 44px;
+    --live2d-right: calc(var(--live2d-stage-center-right) + var(--live2d-optical-shift));
+  }
+}
+
+@media (max-width: 600px) {
+  :root {
+    --live2d-stage-width: 0px;
+    --live2d-stage-gap: 0px;
+    --live2d-right: 8px;
+    --live2d-bottom: 126px;
+    --live2d-width: 148px;
+    --live2d-height: 212px;
+    --live2d-stage-center-right: 8px;
+    --live2d-optical-shift: 0px;
+  }
+
+  .container.theme-xiaohu .chat-interface,
+  .container.theme-xiaohu .welcome-screen {
+    padding-right: 0;
+  }
+
+  .container.theme-xiaohu .input-container {
+    max-width: 100%;
+  }
+
+  #live2d-bubble {
+    bottom: calc(100% + 4px);
+    max-width: min(240px, 62vw);
+    min-width: 0;
+    padding: 12px 14px;
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "default_state": "loading",
+  "states": {
+    "loading": {
+      "label": "Loading",
+      "model": "xiaohu-states/loading/LOADING.model3.json",
+      "motion": "xiaohu-states/loading/motions/Scene1.motion3.json",
+      "runtime_family": "xiaohu-v2",
+      "notes": "Primary waiting state"
+    },
+    "speaking": {
+      "label": "Speaking",
+      "model": "xiaohu-states/speaking/SPEAKING.model3.json",
+      "motion": "xiaohu-states/speaking/motions/Scene1.motion3.json",
+      "runtime_family": "xiaohu-v2",
+      "notes": "Primary speaking state"
+    },
+    "yes": {
+      "label": "Yes",
+      "model": "xiaohu-states/yes/YES.model3.json",
+      "motion": "xiaohu-states/yes/motions/Scene1.motion3.json",
+      "runtime_family": "xiaohu-v2",
+      "notes": "Affirmative response state"
+    },
+    "deny": {
+      "label": "Deny",
+      "model": "xiaohu-states/deny/DENY.model3.json",
+      "motion": "xiaohu-states/deny/motions/Scene1.motion3.json",
+      "runtime_family": "xiaohu-v2-deny",
+      "notes": "Negative response state with different base rig"
+    }
+  },
+  "legacy": {
+    "main": {
+      "label": "LegacyMain",
+      "model": "04072300/04072300.model3.json",
+      "motion": "04072300/motions/Scene1.motion3.json",
+      "notes": "Current online legacy resource"
+    }
+  }
+}

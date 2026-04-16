@@ -14,10 +14,20 @@
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/github-dark.min.css"
     />
+    <link rel="stylesheet" href="/live2d-host.css" />
     <script type="module" crossorigin src="/assets/index-CiS5ENn4.js"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-ARw6czQY.css">
+    <script defer src="/live2d-host.js"></script>
   </head>
   <body>
     <div id="root"></div>
+    <div id="live2d-shell" aria-hidden="true">
+      <iframe
+        id="live2d-frame"
+        src="/live2d-widget/index.html"
+        title="XiaoHu Live2D"
+        loading="lazy"
+      ></iframe>
+    </div>
   </body>
 </html>
